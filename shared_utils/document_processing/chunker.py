@@ -38,8 +38,68 @@ import re
 import hashlib
 
 
+def _is_low_quality_chunk(text: str) -> bool:
+    """
+    Identify low-quality chunks that should be filtered out.
+    
+    @param text: Chunk text to evaluate
+    @return: True if chunk is low quality and should be filtered
+    """
+    text_lower = text.lower().strip()
+    
+    # Skip if too short to be meaningful
+    if len(text.strip()) < 50:
+        return True
+    
+    # Filter out common low-value content
+    low_value_patterns = [
+        # Acknowledgments and credits
+        r'^(acknowledgment|thanks|thank you)',
+        r'(thanks to|grateful to|acknowledge)',
+        
+        # References and citations
+        r'^\s*\[\d+\]',  # Citation markers
+        r'^references?$',
+        r'^bibliography$',
+        
+        # Metadata and headers
+        r'this document is released under',
+        r'creative commons',
+        r'copyright \d{4}',
+        
+        # Table of contents
+        r'^\s*\d+\..*\.\.\.\.\.\d+$',  # TOC entries
+        r'^(contents?|table of contents)$',
+        
+        # Page headers/footers
+        r'^\s*page \d+',
+        r'^\s*\d+\s*$',  # Just page numbers
+        
+        # Figure/table captions that are too short
+        r'^(figure|table|fig\.|tab\.)\s*\d+:?\s*$',
+    ]
+    
+    for pattern in low_value_patterns:
+        if re.search(pattern, text_lower):
+            return True
+    
+    # Check content quality metrics
+    words = text.split()
+    if len(words) < 8:  # Too few words to be meaningful
+        return True
+        
+    # Check for reasonable sentence structure
+    sentences = re.split(r'[.!?]+', text)
+    complete_sentences = [s.strip() for s in sentences if len(s.strip()) > 10]
+    
+    if len(complete_sentences) == 0:  # No complete sentences
+        return True
+    
+    return False
+
+
 def chunk_technical_text(
-    text: str, chunk_size: int = 512, overlap: int = 50
+    text: str, chunk_size: int = 1200, overlap: int = 100
 ) -> List[Dict]:
     """
     Intelligently chunk technical documentation while preserving sentence boundaries.
@@ -142,8 +202,8 @@ def chunk_technical_text(
         # Extract chunk text and clean whitespace
         chunk_text = text[start_pos:chunk_end].strip()
         
-        # Only create chunk if it contains actual content
-        if chunk_text:
+        # Only create chunk if it contains actual content AND passes quality filter
+        if chunk_text and not _is_low_quality_chunk(chunk_text):
             # Generate deterministic chunk ID using content hash
             # MD5 is sufficient for deduplication (not cryptographic use)
             chunk_hash = hashlib.md5(chunk_text.encode()).hexdigest()[:8]
