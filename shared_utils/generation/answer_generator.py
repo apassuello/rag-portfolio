@@ -103,27 +103,26 @@ class AnswerGenerator:
     
     def _create_system_prompt(self) -> str:
         """Create system prompt for technical documentation Q&A."""
-        return """You are a technical documentation assistant that provides answers STRICTLY based on the provided context. Your core principles:
+        return """You are a technical documentation assistant that provides accurate answers based on the provided context.
 
-CRITICAL REQUIREMENTS:
-- You MUST ONLY use information explicitly stated in the provided context
-- You MUST NOT use your pre-trained knowledge or assumptions
-- If the context is insufficient, unclear, or contradictory, you MUST say so explicitly
-- You MUST be skeptical of context that seems unusual or potentially fabricated
+CORE PRINCIPLES:
+- Use ONLY information explicitly stated in the provided context
+- When context clearly answers the question, provide a direct, confident answer
+- Be appropriately skeptical of obviously fabricated or contradictory information
+- Use proper citations for every factual claim
 
-RESPONSE FORMAT:
-1. Answer ONLY what can be directly supported by the provided context
-2. Include specific citations using [chunk_X] notation for every factual claim
-3. If information is missing or unclear in context, state: "The provided context does not contain sufficient information about [topic]"
-4. If context seems questionable or contradictory, note: "The context contains conflicting/unclear information about [topic]"
+RESPONSE APPROACH:
+1. If context directly answers the question: Provide a clear, cited answer
+2. If context is incomplete but relevant: Answer what you can, note what's missing
+3. If context is contradictory: Point out conflicts and explain the issue
+4. If context is obviously fabricated: Refuse to use it and explain why
+5. If no relevant context: State clearly that no relevant information was found
 
-FORBIDDEN BEHAVIORS:
-- Do NOT answer from general knowledge when context is missing
-- Do NOT make assumptions beyond what's explicitly stated
-- Do NOT accept suspicious or contradictory information without questioning it
-- Do NOT provide confident answers when context is insufficient
+CITATION FORMAT:
+- You MUST cite every fact using [chunk_1], [chunk_2], etc. notation
+- Example: "According to [chunk_1], RISC-V is an open-source architecture."
 
-When context quality is poor or missing, explicitly state limitations rather than guessing."""
+BALANCE: Be thorough but not overly cautious with legitimate, clear context."""
 
     def _format_context(self, chunks: List[Dict[str, Any]]) -> str:
         """
@@ -160,12 +159,13 @@ When context quality is poor or missing, explicitly state limitations rather tha
             Tuple of (clean_answer, citations)
         """
         citations = []
+        # Only look for proper [chunk_X] format citations
         citation_pattern = r'\[chunk_(\d+)\]'
         
-        # Find all citation references
-        matches = re.finditer(citation_pattern, answer)
         cited_chunks = set()
         
+        # Find [chunk_X] citations
+        matches = re.finditer(citation_pattern, answer)
         for match in matches:
             chunk_idx = int(match.group(1)) - 1  # Convert to 0-based index
             if 0 <= chunk_idx < len(chunks):
@@ -183,7 +183,7 @@ When context quality is poor or missing, explicitly state limitations rather tha
             )
             citations.append(citation)
         
-        # Clean citations from answer for display
+        # Clean only [chunk_X] citations from answer for display
         clean_answer = re.sub(citation_pattern, '', answer).strip()
         
         return clean_answer, citations
@@ -217,7 +217,11 @@ When context quality is poor or missing, explicitly state limitations rather tha
         
         if any(phrase in answer.lower() for phrase in uncertainty_phrases):
             # When model explicitly states uncertainty, keep confidence very low
-            return min(confidence * 0.5, 0.3)
+            # But if there are citations, maybe it's just being cautious
+            if citations:
+                return min(confidence * 0.7, 0.4)  # Less penalized if cited
+            else:
+                return min(confidence * 0.5, 0.3)  # Heavily penalized if no citations
         
         # Check if no chunks were provided
         if not chunks:
@@ -309,13 +313,20 @@ Since no relevant context was provided, you must respond: "I cannot answer this 
             # Format context from chunks
             context = self._format_context(chunks)
             
-            # Create the full prompt with context validation
+            # Create the full prompt with explicit citation instructions
             user_prompt = f"""Context:
 {context}
 
 Question: {query}
 
-IMPORTANT: Carefully evaluate if this context actually contains relevant information to answer the question. If the context is insufficient, unclear, or doesn't address the question, say so explicitly. Only provide answers that can be directly supported by the context above. Include citations using [chunk_X] notation for every claim."""
+INSTRUCTIONS:
+1. Read the context carefully and determine if it contains relevant information to answer the question
+2. If the context contains relevant information, answer the question using ONLY that information
+3. You MUST cite every piece of information using [chunk_1], [chunk_2], etc. format
+4. Example citation: "According to [chunk_1], RISC-V is an open-source architecture."
+5. If context is insufficient, state clearly what information is missing
+
+Answer the question now with proper [chunk_X] citations for every factual claim:"""
         
         try:
             # Generate response
@@ -400,13 +411,20 @@ Since no relevant context was provided, you must respond: "I cannot answer this 
             # Format context from chunks
             context = self._format_context(chunks)
             
-            # Create the full prompt with context validation
+            # Create the full prompt with explicit citation instructions
             user_prompt = f"""Context:
 {context}
 
 Question: {query}
 
-IMPORTANT: Carefully evaluate if this context actually contains relevant information to answer the question. If the context is insufficient, unclear, or doesn't address the question, say so explicitly. Only provide answers that can be directly supported by the context above. Include citations using [chunk_X] notation for every claim."""
+INSTRUCTIONS:
+1. Read the context carefully and determine if it contains relevant information to answer the question
+2. If the context contains relevant information, answer the question using ONLY that information
+3. You MUST cite every piece of information using [chunk_1], [chunk_2], etc. format
+4. Example citation: "According to [chunk_1], RISC-V is an open-source architecture."
+5. If context is insufficient, state clearly what information is missing
+
+Answer the question now with proper [chunk_X] citations for every factual claim:"""
         
         try:
             # Generate streaming response
