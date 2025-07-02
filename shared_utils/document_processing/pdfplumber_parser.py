@@ -279,6 +279,103 @@ class PDFPlumberParser:
         
         return min(score, 1.0)
 
+    def extract_with_page_coverage(self, pdf_path: Path, pymupdf_pages: List[Dict]) -> List[Dict]:
+        """
+        Extract content ensuring ALL pages are covered using PyMuPDF page data.
+        
+        Args:
+            pdf_path: Path to PDF file
+            pymupdf_pages: Page data from PyMuPDF with page numbers and text
+            
+        Returns:
+            List of chunks covering ALL document pages
+        """
+        chunks = []
+        chunk_id = 0
+        
+        print(f"📄 Processing {len(pymupdf_pages)} pages with PDFPlumber quality extraction...")
+        
+        with pdfplumber.open(str(pdf_path)) as pdf:
+            for pymupdf_page in pymupdf_pages:
+                page_num = pymupdf_page['page_number']  # 1-indexed from PyMuPDF
+                page_idx = page_num - 1  # Convert to 0-indexed for PDFPlumber
+                
+                if page_idx < len(pdf.pages):
+                    # Extract with PDFPlumber quality from this specific page
+                    pdfplumber_page = pdf.pages[page_idx]
+                    page_text = pdfplumber_page.extract_text()
+                    
+                    if page_text and page_text.strip():
+                        # Clean and chunk the page text
+                        cleaned_text = self._clean_text(page_text)
+                        
+                        if len(cleaned_text) >= 100:  # Minimum meaningful content
+                            # Create chunks from this page
+                            page_chunks = self._create_page_chunks(
+                                cleaned_text, page_num, chunk_id
+                            )
+                            chunks.extend(page_chunks)
+                            chunk_id += len(page_chunks)
+                            
+                            if len(chunks) % 50 == 0:  # Progress indicator
+                                print(f"   Processed {page_num} pages, created {len(chunks)} chunks")
+        
+        print(f"✅ Full coverage: {len(chunks)} chunks from {len(pymupdf_pages)} pages")
+        return chunks
+    
+    def _create_page_chunks(self, page_text: str, page_num: int, start_chunk_id: int) -> List[Dict]:
+        """Create properly sized chunks from a single page's content."""
+        if len(page_text) <= self.max_chunk_size:
+            # Single chunk for small pages
+            return [{
+                'text': page_text,
+                'title': f"Page {page_num}",
+                'page': page_num,
+                'metadata': {
+                    'parsing_method': 'pdfplumber_page_coverage',
+                    'quality_score': self._calculate_quality_score(page_text),
+                    'full_page_coverage': True
+                }
+            }]
+        else:
+            # Split large pages into chunks
+            text_chunks = self._split_text_into_chunks(page_text)
+            page_chunks = []
+            
+            for i, chunk_text in enumerate(text_chunks):
+                page_chunks.append({
+                    'text': chunk_text,
+                    'title': f"Page {page_num} (Part {i+1})",
+                    'page': page_num,
+                    'metadata': {
+                        'parsing_method': 'pdfplumber_page_coverage',
+                        'part_number': i + 1,
+                        'total_parts': len(text_chunks),
+                        'quality_score': self._calculate_quality_score(chunk_text),
+                        'full_page_coverage': True
+                    }
+                })
+            
+            return page_chunks
+
+    def parse_document(self, pdf_path: Path, pdf_data: Dict[str, Any] = None) -> List[Dict]:
+        """
+        Parse document using PDFPlumber (required by HybridParser).
+        
+        Args:
+            pdf_path: Path to PDF file
+            pdf_data: PyMuPDF page data to ensure full page coverage
+            
+        Returns:
+            List of chunks with structure preservation across ALL pages
+        """
+        if pdf_data and 'pages' in pdf_data:
+            # Use PyMuPDF page data to ensure full coverage
+            return self.extract_with_page_coverage(pdf_path, pdf_data['pages'])
+        else:
+            # Fallback to structure-based extraction
+            return self.extract_with_structure(pdf_path)
+
 
 def parse_pdf_with_pdfplumber(pdf_path: Path, **kwargs) -> List[Dict]:
     """Main entry point for PDFPlumber parsing."""

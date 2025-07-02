@@ -35,7 +35,7 @@ class HybridRetriever:
         use_mps: bool = True,
         bm25_k1: float = 1.2,
         bm25_b: float = 0.75,
-        rrf_k: int = 1
+        rrf_k: int = 10
     ):
         """
         Initialize hybrid retriever with dense and sparse components.

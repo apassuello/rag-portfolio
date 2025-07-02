@@ -126,30 +126,73 @@ class TOCGuidedParser:
         return toc_entries
     
     def _detect_structure_without_toc(self, pages: List[Dict]) -> List[TOCEntry]:
-        """Fallback: detect structure from content patterns."""
+        """Fallback: detect structure from content patterns across ALL pages."""
         entries = []
         
-        chapter_pattern = re.compile(r'^(Chapter|CHAPTER)\s+(\d+|[IVX]+)(?:\s*[:\-]\s*(.+))?', re.MULTILINE)
-        section_pattern = re.compile(r'^(\d+\.\d+)\s+(.+?)$', re.MULTILINE)
+        # Expanded patterns for better structure detection
+        chapter_patterns = [
+            re.compile(r'^(Chapter|CHAPTER)\s+(\d+|[IVX]+)(?:\s*[:\-]\s*(.+))?', re.MULTILINE),
+            re.compile(r'^(\d+)\s+([A-Z][^.]*?)(?:\s*\.{2,}\s*\d+)?$', re.MULTILINE),  # "1 Introduction"
+            re.compile(r'^([A-Z][A-Z\s]{10,})$', re.MULTILINE),  # ALL CAPS titles
+        ]
         
+        section_patterns = [
+            re.compile(r'^(\d+\.\d+)\s+(.+?)(?:\s*\.{2,}\s*\d+)?$', re.MULTILINE),  # "1.1 Section"
+            re.compile(r'^(\d+\.\d+\.\d+)\s+(.+?)(?:\s*\.{2,}\s*\d+)?$', re.MULTILINE),  # "1.1.1 Subsection"
+        ]
+        
+        # Process ALL pages, not just first 20
         for i, page in enumerate(pages):
             text = page.get('text', '')
+            if not text.strip():
+                continue
             
-            # Find chapters
-            for match in chapter_pattern.finditer(text):
-                title = match.group(3) if match.group(3) else f"Chapter {match.group(2)}"
-                entries.append(TOCEntry(
-                    title=title.strip(),
-                    page=i + 1,
-                    level=0
-                ))
+            # Find chapters with various patterns
+            for pattern in chapter_patterns:
+                for match in pattern.finditer(text):
+                    if len(match.groups()) >= 2:
+                        if len(match.groups()) >= 3 and match.group(3):
+                            title = match.group(3).strip()
+                        else:
+                            title = match.group(2).strip() if match.group(2) else f"Section {match.group(1)}"
+                        
+                        # Skip very short or likely false positives
+                        if len(title) >= 3 and not re.match(r'^\d+$', title):
+                            entries.append(TOCEntry(
+                                title=title,
+                                page=i + 1,
+                                level=0
+                            ))
             
             # Find sections
-            for match in section_pattern.finditer(text):
+            for pattern in section_patterns:
+                for match in pattern.finditer(text):
+                    section_num = match.group(1)
+                    title = match.group(2).strip() if len(match.groups()) >= 2 else f"Section {section_num}"
+                    
+                    # Determine level by number of dots
+                    level = section_num.count('.') 
+                    
+                    # Skip very short titles or obvious artifacts
+                    if len(title) >= 3 and not re.match(r'^\d+$', title):
+                        entries.append(TOCEntry(
+                            title=title,
+                            page=i + 1,
+                            level=level
+                        ))
+        
+        # If still no entries found, create page-based entries for full coverage
+        if not entries:
+            print("No structure patterns found, creating page-based sections for full coverage")
+            # Create sections every 10 pages to ensure full document coverage
+            for i in range(0, len(pages), 10):
+                start_page = i + 1
+                end_page = min(i + 10, len(pages))
+                title = f"Pages {start_page}-{end_page}"
                 entries.append(TOCEntry(
-                    title=match.group(2).strip(),
-                    page=i + 1,
-                    level=1
+                    title=title,
+                    page=start_page,
+                    level=0
                 ))
         
         return entries

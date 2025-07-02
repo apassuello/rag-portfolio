@@ -199,25 +199,58 @@ Currently working on **Project 1: Technical Documentation RAG System**.
 - **Enhancement**: Disabled by default - proven no benefit in evaluation
 - **Quality Assurance**: Manual verification mandatory for production deployment
 
+### Critical Issues Discovered During Comprehensive Testing ⚠️
+
+#### **ARCHITECTURAL FAILURES BLOCKING PRODUCTION:**
+
+**1. Document Processing Failures (60% failure rate)**
+- **Missing Method**: `'PDFPlumberParser' object has no attribute 'parse_document'`
+- **Impact**: 3 out of 5 documents completely fail to process
+- **Failed Documents**: GMLP_Guiding_Principles.pdf, AIML-SaMD-Action-Plan.pdf, Premarket-Software-Functions-Guidance.pdf
+- **Root Cause**: Hybrid parser calls non-existent method when TOC detection fails
+
+**2. Severe Page Coverage Limitation (0.4% coverage)**
+- **RISC-V Document**: Only 1 page processed out of 238 total pages
+- **Content Loss**: 99.6% of document content inaccessible to queries
+- **TOC Issues**: Only finds "1 TOC entries" in complex technical documents
+- **Impact**: System essentially unusable for comprehensive document querying
+
+**3. Hybrid Scoring System Malfunction**
+- **Suspicious Patterns**: Identical scores (0.350, 0.233, 0.175) across different queries
+- **Score Ceiling**: Hybrid scores artificially capped below semantic scores
+- **RRF Issues**: Reciprocal Rank Fusion algorithm producing artificial normalization
+- **Evidence**: Pattern repetition regardless of query content
+
+**4. Multi-Document Processing Gaps**
+- **Single Document Design**: BasicRAG.index_document() processes one PDF at a time
+- **No Document Collection Support**: Cannot process folder of documents
+- **Source Tracking**: Limited ability to maintain document source diversity
+- **Query Isolation**: Each query finds content in only one source
+
+**5. TOC Content Contamination**
+- **TOC Not Removed**: Table of contents included in searchable chunks instead of navigation-only
+- **Content Quality**: TOC fragments mixed with actual technical content
+- **Search Pollution**: TOC entries compete with actual content in search results
+
 ### Critical Lessons for ML Engineering
 
-#### 1. Quality Assessment Methodology
-- **Never trust metrics alone** - manual verification is essential
-- **Examine actual content** - not just statistical measures
-- **Test with real queries** - see what users would actually get
-- **Fragment detection** - ensure chunks are complete thoughts
+#### 1. Quality Assessment Methodology - VALIDATED
+- **Never trust metrics alone** - our comprehensive testing proved this critical
+- **Examine actual content** - revealed issues hidden by good-looking metrics
+- **Test with real scenarios** - multi-document testing exposed architectural flaws
+- **Fragment detection** - manual verification caught misleading automated assessments
 
-#### 2. RAG System Development Process
-- **Start with document structure analysis** - understand the PDF layout
-- **Iterative parser improvement** - test each approach thoroughly
-- **Quality-first approach** - optimize for content quality, not just metrics
-- **Production validation** - comprehensive testing before deployment
+#### 2. RAG System Development Process - LESSONS LEARNED
+- **Comprehensive testing essential** - narrow testing missed 60% failure rate
+- **Multi-document validation required** - single-document success ≠ system success
+- **Architectural robustness** - graceful degradation when components fail
+- **End-to-end validation** - full pipeline testing reveals integration failures
 
-#### 3. Swiss Tech Market Standards
-- **Quality over speed** - ensure excellent results before optimizing performance
-- **Thorough documentation** - comprehensive analysis and validation
-- **Production readiness** - every component deployment-ready
-- **Evidence-based decisions** - let data guide architecture choices
+#### 3. Swiss Tech Market Standards - REINFORCED
+- **Quality over speed** - rushing to "production ready" without proper testing fails
+- **Thorough validation** - comprehensive testing prevented catastrophic deployment
+- **Evidence-based decisions** - data-driven assessment prevented false confidence
+- **Production readiness** - must validate ALL functionality, not just success cases
 
 ## Implementation Quality Standards
 - **Type hints** for all functions
@@ -306,12 +339,12 @@ rag-portfolio/
 - **Content-based caching** for performance where appropriate
 - **Modular composition** over inheritance for flexibility
 
-## Current Session Context
-- **Project Status**: Week 1 & 2 COMPLETE - Production-ready RAG system achieved
-- **Latest Achievement**: Repository cleanup and comprehensive quality validation
-- **System Quality**: 99.5% optimal chunks, 0% fragments, excellent technical content
-- **Current Phase**: Transition to Week 3 (Answer Generation & Deployment)
-- **Key Learning**: Manual verification essential for quality assurance in RAG systems
-- **Production Readiness**: Clean codebase, comprehensive testing, verified performance
-- **Next Goals**: LLM integration for answer generation, Streamlit deployment
-- **Timeline**: Ahead of schedule with production-quality foundation for remaining work
+## Current Session Context - CRITICAL ISSUES DISCOVERED
+- **Project Status**: Week 2 INCOMPLETE - Major architectural failures discovered
+- **Critical Discovery**: Comprehensive testing revealed fundamental system failures
+- **System Status**: UNSUITABLE FOR PRODUCTION - requires immediate architectural fixes
+- **Current Phase**: Emergency architectural redesign needed before proceeding
+- **Key Learning**: Initial metrics were misleading - manual verification revealed catastrophic failures
+- **Production Readiness**: BLOCKED - 60% document failure rate, 0.4% page coverage
+- **Immediate Priority**: Fix core parsing and multi-document processing before assessment
+- **Timeline**: Must resolve architectural issues before proceeding to Week 3

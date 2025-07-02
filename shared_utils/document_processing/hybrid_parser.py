@@ -92,6 +92,24 @@ class HybridParser:
             r'processor.*?implementation',
             r'architecture.*?design',
         ]
+        
+        # TOC-specific patterns to exclude from searchable content
+        self.toc_exclusion_patterns = [
+            r'^\s*Contents\s*$',
+            r'^\s*Table\s+of\s+Contents\s*$',
+            r'^\s*\d+(?:\.\d+)*\s*$',  # Standalone section numbers
+            r'^\s*\d+(?:\.\d+)*\s+[A-Z]',  # "1.1 INTRODUCTION" style
+            r'\.{3,}',  # Multiple dots (TOC formatting)
+            r'^\s*Chapter\s+\d+\s*$',  # Standalone "Chapter N"
+            r'^\s*Section\s+\d+(?:\.\d+)*\s*$',  # Standalone "Section N.M"
+            r'^\s*Appendix\s+[A-Z]\s*$',  # Standalone "Appendix A"
+            r'^\s*[ivxlcdm]+\s*$',  # Roman numerals alone
+            r'^\s*Preface\s*$',
+            r'^\s*Introduction\s*$',
+            r'^\s*Conclusion\s*$',
+            r'^\s*Bibliography\s*$',
+            r'^\s*Index\s*$',
+        ]
     
     def parse_document(self, pdf_path: Path, pdf_data: Dict[str, Any]) -> List[Dict[str, Any]]:
         """
@@ -111,9 +129,18 @@ class HybridParser:
         toc_entries = self.toc_parser.parse_toc(pdf_data['pages'])
         print(f"   Found {len(toc_entries)} TOC entries")
         
-        if not toc_entries:
-            print("   ⚠️ No TOC found, falling back to PDFPlumber-only parsing")
-            return self.plumber_parser.parse_document(pdf_path)
+        # Check if TOC is reliable (multiple entries or quality single entry)
+        toc_is_reliable = (
+            len(toc_entries) > 1 or  # Multiple entries = likely real TOC
+            (len(toc_entries) == 1 and len(toc_entries[0].title) > 10)  # Quality single entry
+        )
+        
+        if not toc_entries or not toc_is_reliable:
+            if not toc_entries:
+                print("   ⚠️ No TOC found, using full page coverage parsing")
+            else:
+                print(f"   ⚠️ TOC quality poor (title: '{toc_entries[0].title}'), using full page coverage")
+            return self.plumber_parser.parse_document(pdf_path, pdf_data)
         
         # Step 2: Use PDFPlumber for precise extraction
         print("🔬 Step 2: PDFPlumber extraction of TOC sections...")
@@ -248,12 +275,17 @@ class HybridParser:
                 'bit', 'byte', 'address', 'data', 'control', 'operand'
             ])
             
-            # Check if sentence is trash
+            # Check if sentence is trash (including general trash and TOC content)
             is_trash = any(re.search(pattern, sentence, re.IGNORECASE) 
                           for pattern in self.trash_patterns)
             
-            # Preserve if technical and not trash, or if substantial and not clearly trash
-            if (is_technical and not is_trash) or (len(sentence) > 50 and not is_trash):
+            # Check if sentence is TOC content (should be excluded)
+            is_toc_content = any(re.search(pattern, sentence, re.IGNORECASE) 
+                               for pattern in self.toc_exclusion_patterns)
+            
+            # Preserve if technical and not trash/TOC, or if substantial and not clearly trash/TOC
+            if ((is_technical and not is_trash and not is_toc_content) or 
+                (len(sentence) > 50 and not is_trash and not is_toc_content)):
                 preserved_sentences.append(sentence)
         
         # Reconstruct content from preserved sentences
