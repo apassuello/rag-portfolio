@@ -223,15 +223,44 @@ class PDFPlumberParser:
     
     def _clean_text(self, text: str) -> str:
         """Clean text from artifacts."""
-        # Remove multiple spaces
-        text = re.sub(r'\s+', ' ', text)
+        # Remove volume headers (e.g., "Volume I: RISC-V Unprivileged ISA V20191213")
+        text = re.sub(r'Volume\s+[IVX]+:\s*RISC-V[^V]*V\d{8}\s*', '', text, flags=re.IGNORECASE)
+        text = re.sub(r'^\d+\s+Volume\s+[IVX]+:.*?$', '', text, flags=re.MULTILINE)
         
-        # Remove page numbers at start/end
-        text = re.sub(r'^\d+\s+', '', text)
-        text = re.sub(r'\s+\d+$', '', text)
+        # Remove document version artifacts
+        text = re.sub(r'Document Version \d{8}\s*', '', text, flags=re.IGNORECASE)
         
-        # Remove excessive dots
+        # Remove repeated ISA headers
+        text = re.sub(r'RISC-V.*?ISA.*?V\d{8}\s*', '', text, flags=re.IGNORECASE)
+        text = re.sub(r'The RISC-V Instruction Set Manual\s*', '', text, flags=re.IGNORECASE)
+        
+        # Remove figure/table references that are standalone
+        text = re.sub(r'^(Figure|Table)\s+\d+\.\d+:.*?$', '', text, flags=re.MULTILINE)
+        
+        # Remove email addresses (often in contributor lists)
+        text = re.sub(r'[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}', '', text)
+        
+        # Remove URLs
+        text = re.sub(r'https?://[^\s]+', '', text)
+        
+        # Remove page numbers at start/end of lines
+        text = re.sub(r'^\d{1,3}\s+', '', text, flags=re.MULTILINE)
+        text = re.sub(r'\s+\d{1,3}$', '', text, flags=re.MULTILINE)
+        
+        # Remove excessive dots (TOC artifacts)
         text = re.sub(r'\.{3,}', '', text)
+        
+        # Remove standalone numbers (often page numbers or figure numbers)
+        text = re.sub(r'^\s*\d+\s*$', '', text, flags=re.MULTILINE)
+        
+        # Clean up multiple spaces and newlines
+        text = re.sub(r'\s{3,}', ' ', text)
+        text = re.sub(r'\n{3,}', '\n\n', text)
+        text = re.sub(r'[ \t]+', ' ', text)  # Normalize all whitespace
+        
+        # Remove common boilerplate phrases
+        text = re.sub(r'Contains Nonbinding Recommendations\s*', '', text, flags=re.IGNORECASE)
+        text = re.sub(r'Guidance for Industry and FDA Staff\s*', '', text, flags=re.IGNORECASE)
         
         return text.strip()
     

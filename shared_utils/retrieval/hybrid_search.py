@@ -13,7 +13,7 @@ project_root = Path(__file__).parent.parent.parent / "project-1-technical-rag"
 sys.path.append(str(project_root))
 
 from src.sparse_retrieval import BM25SparseRetriever
-from src.fusion import reciprocal_rank_fusion
+from src.fusion import reciprocal_rank_fusion, adaptive_fusion
 from shared_utils.embeddings.generator import generate_embeddings
 import faiss
 
@@ -157,12 +157,12 @@ class HybridRetriever:
         # Sparse BM25 search  
         sparse_results = self.sparse_retriever.search(query, sparse_top_k)
         
-        # Combine using Reciprocal Rank Fusion
-        fused_results = reciprocal_rank_fusion(
+        # Combine using Adaptive Fusion (better for small result sets)
+        fused_results = adaptive_fusion(
             dense_results=dense_results,
             sparse_results=sparse_results,
             dense_weight=self.dense_weight,
-            k=self.rrf_k
+            result_size=top_k
         )
         
         # Prepare final results with chunk content and apply source diversity
