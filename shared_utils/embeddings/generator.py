@@ -10,7 +10,7 @@ _model_cache = {}
 
 def generate_embeddings(
     texts: List[str],
-    model_name: str = "sentence-transformers/all-MiniLM-L6-v2",
+    model_name: str = "sentence-transformers/multi-qa-MiniLM-L6-cos-v1",
     batch_size: int = 32,
     use_mps: bool = True,
 ) -> np.ndarray:

@@ -31,11 +31,11 @@ class HybridRetriever:
     def __init__(
         self,
         dense_weight: float = 0.7,
-        embedding_model: str = "sentence-transformers/all-MiniLM-L6-v2",
+        embedding_model: str = "sentence-transformers/multi-qa-MiniLM-L6-cos-v1",
         use_mps: bool = True,
         bm25_k1: float = 1.2,
         bm25_b: float = 0.75,
-        rrf_k: int = 60
+        rrf_k: int = 1
     ):
         """
         Initialize hybrid retriever with dense and sparse components.
@@ -46,7 +46,7 @@ class HybridRetriever:
             use_mps: Use Apple Silicon MPS acceleration for embeddings
             bm25_k1: BM25 term frequency saturation parameter
             bm25_b: BM25 document length normalization parameter
-            rrf_k: Reciprocal Rank Fusion constant
+            rrf_k: Reciprocal Rank Fusion constant (1=strong rank preference, 2=moderate)
             
         Raises:
             ValueError: If parameters are invalid
@@ -165,13 +165,16 @@ class HybridRetriever:
             k=self.rrf_k
         )
         
-        # Prepare final results with chunk content
+        # Prepare final results with chunk content and apply source diversity
         final_results = []
-        for chunk_idx, rrf_score in fused_results[:top_k]:
+        for chunk_idx, rrf_score in fused_results:
             chunk_dict = self.chunks[chunk_idx]
             final_results.append((chunk_idx, rrf_score, chunk_dict))
+        
+        # Apply source diversity enhancement
+        diverse_results = self._enhance_source_diversity(final_results, top_k)
             
-        return final_results
+        return diverse_results
         
     def _dense_search(self, query: str, top_k: int) -> List[Tuple[int, float]]:
         """
@@ -205,6 +208,52 @@ class HybridRetriever:
         ]
         
         return results
+    
+    def _enhance_source_diversity(
+        self, 
+        results: List[Tuple[int, float, Dict]], 
+        top_k: int,
+        max_per_source: int = 2
+    ) -> List[Tuple[int, float, Dict]]:
+        """
+        Enhance source diversity in retrieval results to prevent over-focusing on single documents.
+        
+        Args:
+            results: List of (chunk_idx, score, chunk_dict) tuples sorted by relevance
+            top_k: Maximum number of results to return
+            max_per_source: Maximum chunks allowed per source document
+            
+        Returns:
+            Diversified results maintaining relevance while improving source coverage
+        """
+        if not results:
+            return []
+            
+        source_counts = {}
+        diverse_results = []
+        
+        # First pass: Add highest scoring results respecting source limits
+        for chunk_idx, score, chunk_dict in results:
+            source = chunk_dict.get('source', 'unknown')
+            current_count = source_counts.get(source, 0)
+            
+            if current_count < max_per_source:
+                diverse_results.append((chunk_idx, score, chunk_dict))
+                source_counts[source] = current_count + 1
+                
+                if len(diverse_results) >= top_k:
+                    break
+        
+        # Second pass: If we still need more results, relax source constraints
+        if len(diverse_results) < top_k:
+            for chunk_idx, score, chunk_dict in results:
+                if (chunk_idx, score, chunk_dict) not in diverse_results:
+                    diverse_results.append((chunk_idx, score, chunk_dict))
+                    
+                    if len(diverse_results) >= top_k:
+                        break
+        
+        return diverse_results[:top_k]
         
     def get_retrieval_stats(self) -> Dict[str, any]:
         """
