@@ -325,38 +325,74 @@ class PDFPlumberParser:
     
     def _create_page_chunks(self, page_text: str, page_num: int, start_chunk_id: int) -> List[Dict]:
         """Create properly sized chunks from a single page's content."""
-        if len(page_text) <= self.max_chunk_size:
+        # Clean and validate page text first
+        cleaned_text = self._ensure_complete_sentences(page_text)
+        
+        if not cleaned_text or len(cleaned_text) < 50:
+            # Skip pages with insufficient content
+            return []
+        
+        if len(cleaned_text) <= self.max_chunk_size:
             # Single chunk for small pages
             return [{
-                'text': page_text,
+                'text': cleaned_text,
                 'title': f"Page {page_num}",
                 'page': page_num,
                 'metadata': {
                     'parsing_method': 'pdfplumber_page_coverage',
-                    'quality_score': self._calculate_quality_score(page_text),
+                    'quality_score': self._calculate_quality_score(cleaned_text),
                     'full_page_coverage': True
                 }
             }]
         else:
-            # Split large pages into chunks
-            text_chunks = self._split_text_into_chunks(page_text)
+            # Split large pages into chunks with sentence boundaries
+            text_chunks = self._split_text_into_chunks(cleaned_text)
             page_chunks = []
             
             for i, chunk_text in enumerate(text_chunks):
-                page_chunks.append({
-                    'text': chunk_text,
-                    'title': f"Page {page_num} (Part {i+1})",
-                    'page': page_num,
-                    'metadata': {
-                        'parsing_method': 'pdfplumber_page_coverage',
-                        'part_number': i + 1,
-                        'total_parts': len(text_chunks),
-                        'quality_score': self._calculate_quality_score(chunk_text),
-                        'full_page_coverage': True
-                    }
-                })
+                # Ensure each chunk is complete
+                complete_chunk = self._ensure_complete_sentences(chunk_text)
+                
+                if complete_chunk and len(complete_chunk) >= 100:
+                    page_chunks.append({
+                        'text': complete_chunk,
+                        'title': f"Page {page_num} (Part {i+1})",
+                        'page': page_num,
+                        'metadata': {
+                            'parsing_method': 'pdfplumber_page_coverage',
+                            'part_number': i + 1,
+                            'total_parts': len(text_chunks),
+                            'quality_score': self._calculate_quality_score(complete_chunk),
+                            'full_page_coverage': True
+                        }
+                    })
             
             return page_chunks
+    
+    def _ensure_complete_sentences(self, text: str) -> str:
+        """Ensure text contains only complete sentences."""
+        text = text.strip()
+        if not text:
+            return ""
+        
+        # Find last complete sentence
+        last_sentence_end = -1
+        for i, char in enumerate(reversed(text)):
+            if char in '.!?:':
+                last_sentence_end = len(text) - i
+                break
+        
+        if last_sentence_end > 0:
+            # Return text up to last complete sentence
+            complete_text = text[:last_sentence_end].strip()
+            
+            # Ensure it starts properly (capital letter or common starters)
+            if complete_text and (complete_text[0].isupper() or 
+                                complete_text.startswith(('The ', 'A ', 'An ', 'This ', 'RISC'))):
+                return complete_text
+        
+        # If no complete sentences found, return empty
+        return ""
 
     def parse_document(self, pdf_path: Path, pdf_data: Dict[str, Any] = None) -> List[Dict]:
         """
