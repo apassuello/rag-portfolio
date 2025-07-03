@@ -215,63 +215,88 @@ TECHNICAL DOCUMENTATION RULES:
         Returns:
             Confidence score (0.0-1.0)
         """
-        # Start with very conservative base confidence
-        confidence = 0.2
+        # Start with minimal base confidence
+        confidence = 0.05  # Much lower starting point
         
-        # Check for explicit uncertainty indicators in the answer
+        # Expanded uncertainty and refusal indicators
         uncertainty_phrases = [
             "does not contain sufficient information",
             "context does not provide",
             "unclear",
-            "conflicting",
+            "conflicting", 
             "insufficient information",
             "cannot determine",
             "not specified",
-            "questionable"
+            "questionable",
+            "refuse to answer",  # New
+            "not contained",     # New
+            "no mention",        # New
+            "no relevant",       # New
+            "cannot answer",     # New
+            "does not contain relevant",  # New
+            "missing",           # New
+            "not explicitly"     # New
         ]
         
+        # Check for uncertainty/refusal indicators - these should drastically reduce confidence
         if any(phrase in answer.lower() for phrase in uncertainty_phrases):
-            # When model explicitly states uncertainty, keep confidence very low
-            # But if there are citations, maybe it's just being cautious
-            if citations:
-                return min(confidence * 0.7, 0.4)  # Less penalized if cited
-            else:
-                return min(confidence * 0.5, 0.3)  # Heavily penalized if no citations
+            # For refusal/uncertainty answers, confidence should be very low regardless of citations
+            return min(0.1, confidence * 2)  # Max 10% for uncertain/refusal answers
         
         # Check if no chunks were provided
         if not chunks:
             # No context = very low confidence, regardless of answer content
-            return 0.1
+            return 0.05
         
-        # Factor 1: Citation coverage (citations required for confidence boost)
+        # Factor 1: Query-Context Relevance Assessment (NEW - CRITICAL)
+        if chunks:
+            scores = [chunk.get('score', 0) for chunk in chunks]
+            max_relevance = max(scores) if scores else 0
+            avg_relevance = sum(scores) / len(scores) if scores else 0
+            
+            # If all chunks have very low relevance scores, this is likely an irrelevant query
+            if max_relevance < 0.4:
+                # Very low relevance = very low confidence regardless of other factors
+                return min(0.08, confidence)  # Max 8% for low relevance context
+            elif max_relevance < 0.6:
+                # Moderate relevance = cap confidence at lower level
+                confidence = min(confidence, 0.15)
+        
+        # Factor 2: Citation coverage (only boost if relevance is good)
         if citations and chunks:
             citation_ratio = len(citations) / min(len(chunks), 3)
-            confidence += 0.3 * citation_ratio
+            # Only boost confidence if chunks are actually relevant (score > 0.6)
+            relevant_chunks = [c for c in chunks if c.get('score', 0) > 0.6]
+            if relevant_chunks:
+                confidence += 0.3 * citation_ratio
+            else:
+                # Citations to irrelevant chunks don't boost confidence
+                confidence += 0.1 * citation_ratio
         else:
             # No citations = suspicious, reduce confidence
             confidence *= 0.6
         
-        # Factor 2: Average relevance score of cited chunks
+        # Factor 3: Average relevance score of cited chunks
         if citations:
             avg_relevance = sum(c.relevance_score for c in citations) / len(citations)
             # Only boost confidence if relevance is genuinely high
             if avg_relevance > 0.7:
                 confidence += 0.2 * avg_relevance
-            elif avg_relevance < 0.3:
-                # Low relevance chunks = reduce confidence
-                confidence *= 0.7
+            elif avg_relevance < 0.4:  # Lowered threshold
+                # Low relevance chunks = significantly reduce confidence
+                confidence *= 0.4  # Stronger penalty
         
-        # Factor 3: Context quality assessment
+        # Factor 4: Context quality assessment
         if chunks:
             # Check for very short or potentially low-quality chunks
             avg_chunk_length = sum(len(chunk.get('content', chunk.get('text', ''))) for chunk in chunks) / len(chunks)
             if avg_chunk_length < 100:  # Very short chunks
                 confidence *= 0.8
             
-            # Check if all chunks have very low similarity scores
+            # Check if all chunks have very low similarity scores (redundant but kept for compatibility)
             scores = [chunk.get('score', 0) for chunk in chunks]
             if scores and max(scores) < 0.5:
-                confidence *= 0.7
+                confidence *= 0.5  # Stronger penalty
         
         # Factor 4: Answer characteristics and content quality
         answer_words = len(answer.split())
