@@ -128,41 +128,29 @@ class AnswerGenerator:
     
     def _create_system_prompt(self) -> str:
         """Create system prompt for technical documentation Q&A."""
-        return """You are a technical documentation assistant that provides accurate answers based on the provided context.
+        return """You are a technical documentation assistant that provides clear, accurate answers based on the provided context.
 
-CRITICAL RULES:
-1. NEVER add technical details not explicitly stated in the context
-   - Do NOT specify numbers, measurements, or specifications unless in context
-   - Do NOT use pre-trained knowledge to "complete" partial information
-   - Do NOT make educated guesses or inferences
-   
-2. CONTEXT ADHERENCE:
-   - Every technical claim MUST be directly traceable to the context
-   - If context mentions "RISC-V has instruction formats" WITHOUT listing them, 
-     say "The context mentions RISC-V has instruction formats but doesn't specify which ones"
-   - For partial information, state ONLY what's given and explicitly note what's missing
+CORE PRINCIPLES:
+1. ANSWER DIRECTLY: If context contains the answer, provide it clearly and confidently
+2. BE CONCISE: Keep responses focused and avoid unnecessary uncertainty language
+3. CITE ACCURATELY: Use [chunk_X] citations for every fact from context
 
-3. RESPONSE APPROACH:
-   - Complete context → Provide detailed, cited answer
-   - Partial context → Answer what's available, explicitly note gaps
-   - Irrelevant context → Brief refusal: "The context doesn't contain relevant information"
-   - Suspicious context → Flag concerns and refuse to use
+RESPONSE GUIDELINES:
+- If context has sufficient information → Answer directly and confidently
+- If context has partial information → Answer what's available, note what's missing briefly
+- If context is irrelevant → Brief refusal: "This information isn't available in the provided documents"
 
-4. CITATION REQUIREMENTS:
-   - EVERY fact must have [chunk_X] citation
-   - No citation = information not used
+CITATION FORMAT:
+- Use [chunk_1], [chunk_2] etc. for all facts from context
+- Example: "According to [chunk_1], RISC-V is an open-source architecture."
 
-VERIFICATION STEP:
-Before finalizing your answer, ALWAYS verify:
-1. Is every technical detail explicitly stated in the context?
-2. Am I adding any numbers, sizes, or specifications from my training?
-3. If context is incomplete, am I stating what's missing rather than guessing?
+WHAT TO AVOID:
+- Do NOT add details not in context
+- Do NOT second-guess yourself if context is clear
+- Do NOT use phrases like "does not contain sufficient information" when context clearly answers the question
+- Do NOT be overly cautious when context is adequate
 
-TECHNICAL DOCUMENTATION RULES:
-- Technical specifications must be quoted verbatim from context
-- Never interpolate between data points
-- Never provide "typical" values for unspecified parameters
-- When in doubt, request more specific documentation"""
+Be direct, confident, and accurate. If the context answers the question, provide that answer clearly."""
 
     def _format_context(self, chunks: List[Dict[str, Any]]) -> str:
         """
@@ -189,22 +177,21 @@ TECHNICAL DOCUMENTATION RULES:
     
     def _extract_citations(self, answer: str, chunks: List[Dict[str, Any]]) -> Tuple[str, List[Citation]]:
         """
-        Extract citations from the generated answer.
+        Extract citations from the generated answer and integrate them naturally.
         
         Args:
             answer: Generated answer with [chunk_X] citations
             chunks: Original chunks used for context
             
         Returns:
-            Tuple of (clean_answer, citations)
+            Tuple of (natural_answer, citations)
         """
         citations = []
-        # Only look for proper [chunk_X] format citations
         citation_pattern = r'\[chunk_(\d+)\]'
         
         cited_chunks = set()
         
-        # Find [chunk_X] citations
+        # Find [chunk_X] citations and collect cited chunks
         matches = re.finditer(citation_pattern, answer)
         for match in matches:
             chunk_idx = int(match.group(1)) - 1  # Convert to 0-based index
@@ -212,6 +199,7 @@ TECHNICAL DOCUMENTATION RULES:
                 cited_chunks.add(chunk_idx)
         
         # Create Citation objects for each cited chunk
+        chunk_to_source = {}
         for idx in cited_chunks:
             chunk = chunks[idx]
             citation = Citation(
@@ -222,11 +210,28 @@ TECHNICAL DOCUMENTATION RULES:
                 text_snippet=chunk.get('content', chunk.get('text', ''))[:200] + '...'
             )
             citations.append(citation)
+            
+            # Map chunk reference to natural source name
+            source_name = chunk.get('metadata', {}).get('source', 'unknown')
+            if source_name != 'unknown':
+                # Use just the filename without extension for natural reference
+                natural_name = Path(source_name).stem.replace('-', ' ').replace('_', ' ')
+                chunk_to_source[f'[chunk_{idx+1}]'] = f"the {natural_name} documentation"
+            else:
+                chunk_to_source[f'[chunk_{idx+1}]'] = "the documentation"
         
-        # Clean only [chunk_X] citations from answer for display
-        clean_answer = re.sub(citation_pattern, '', answer).strip()
+        # Replace [chunk_X] with natural references instead of removing them
+        natural_answer = answer
+        for chunk_ref, natural_ref in chunk_to_source.items():
+            natural_answer = natural_answer.replace(chunk_ref, natural_ref)
         
-        return clean_answer, citations
+        # Clean up any remaining unreferenced citations (fallback)
+        natural_answer = re.sub(r'\[chunk_\d+\]', 'the documentation', natural_answer)
+        
+        # Clean up multiple spaces and formatting
+        natural_answer = re.sub(r'\s+', ' ', natural_answer).strip()
+        
+        return natural_answer, citations
     
     def _calculate_confidence(self, answer: str, citations: List[Citation], chunks: List[Dict[str, Any]]) -> float:
         """
@@ -467,34 +472,29 @@ TECHNICAL DOCUMENTATION RULES:
         
         # Check for no-context or very poor context situation
         if not chunks or all(len(chunk.get('content', chunk.get('text', ''))) < 20 for chunk in chunks):
-            # Handle no-context situation explicitly with stronger instruction
+            # Handle no-context situation with brief, professional refusal
             user_prompt = f"""Context: [NO RELEVANT CONTEXT FOUND]
 
 Question: {query}
 
-CRITICAL INSTRUCTION: You MUST respond with exactly this message and NOTHING else:
+INSTRUCTION: Respond with exactly this brief message:
 
-"I cannot answer this question because no relevant context was found in the available documents. To get an accurate answer, please ensure the relevant documents are properly indexed and contain information about this topic."
+"This information isn't available in the provided documents."
 
-DO NOT add any additional information from your training data. DO NOT provide definitions or explanations. ONLY use the exact response above."""
+DO NOT elaborate, explain, or add any other information."""
         else:
             # Format context from chunks
             context = self._format_context(chunks)
             
-            # Create the full prompt with explicit citation instructions
+            # Create concise prompt for faster generation
             user_prompt = f"""Context:
 {context}
 
 Question: {query}
 
-INSTRUCTIONS:
-1. Read the context carefully and determine if it contains relevant information to answer the question
-2. If the context contains relevant information, answer the question using ONLY that information
-3. You MUST cite every piece of information using [chunk_1], [chunk_2], etc. format
-4. Example citation: "According to [chunk_1], RISC-V is an open-source architecture."
-5. If context is insufficient, state clearly what information is missing
+Instructions: Answer using only the context above. Cite with [chunk_1], [chunk_2] etc.
 
-Answer the question now with proper [chunk_X] citations for every factual claim:"""
+Answer:"""
         
         try:
             # Generate response
@@ -506,7 +506,10 @@ Answer the question now with proper [chunk_X] citations for every factual claim:
                 ],
                 options={
                     "temperature": self.temperature,
-                    "num_predict": self.max_tokens
+                    "num_predict": min(self.max_tokens, 300),  # Reduce max tokens for speed
+                    "top_k": 40,  # Optimize sampling for speed
+                    "top_p": 0.9,
+                    "repeat_penalty": 1.1
                 },
                 stream=False  # Get complete response for processing
             )
@@ -569,34 +572,29 @@ Answer the question now with proper [chunk_X] citations for every factual claim:
         
         # Check for no-context or very poor context situation
         if not chunks or all(len(chunk.get('content', chunk.get('text', ''))) < 20 for chunk in chunks):
-            # Handle no-context situation explicitly with stronger instruction
+            # Handle no-context situation with brief, professional refusal
             user_prompt = f"""Context: [NO RELEVANT CONTEXT FOUND]
 
 Question: {query}
 
-CRITICAL INSTRUCTION: You MUST respond with exactly this message and NOTHING else:
+INSTRUCTION: Respond with exactly this brief message:
 
-"I cannot answer this question because no relevant context was found in the available documents. To get an accurate answer, please ensure the relevant documents are properly indexed and contain information about this topic."
+"This information isn't available in the provided documents."
 
-DO NOT add any additional information from your training data. DO NOT provide definitions or explanations. ONLY use the exact response above."""
+DO NOT elaborate, explain, or add any other information."""
         else:
             # Format context from chunks
             context = self._format_context(chunks)
             
-            # Create the full prompt with explicit citation instructions
+            # Create concise prompt for faster generation
             user_prompt = f"""Context:
 {context}
 
 Question: {query}
 
-INSTRUCTIONS:
-1. Read the context carefully and determine if it contains relevant information to answer the question
-2. If the context contains relevant information, answer the question using ONLY that information
-3. You MUST cite every piece of information using [chunk_1], [chunk_2], etc. format
-4. Example citation: "According to [chunk_1], RISC-V is an open-source architecture."
-5. If context is insufficient, state clearly what information is missing
+Instructions: Answer using only the context above. Cite with [chunk_1], [chunk_2] etc.
 
-Answer the question now with proper [chunk_X] citations for every factual claim:"""
+Answer:"""
         
         try:
             # Generate streaming response
@@ -608,7 +606,10 @@ Answer the question now with proper [chunk_X] citations for every factual claim:
                 ],
                 options={
                     "temperature": self.temperature,
-                    "num_predict": self.max_tokens
+                    "num_predict": min(self.max_tokens, 300),  # Reduce max tokens for speed
+                    "top_k": 40,  # Optimize sampling for speed
+                    "top_p": 0.9,
+                    "repeat_penalty": 1.1
                 },
                 stream=True
             )
