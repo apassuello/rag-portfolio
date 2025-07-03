@@ -12,6 +12,18 @@ from typing import List, Dict, Any, Optional, Generator, Tuple
 import ollama
 from datetime import datetime
 import re
+from pathlib import Path
+import sys
+
+# Import calibration framework
+try:
+    # Try relative import first
+    from ...project_1_technical_rag.src.confidence_calibration import ConfidenceCalibrator
+except ImportError:
+    # Fallback to absolute import
+    project_root = Path(__file__).parent.parent.parent / "project-1-technical-rag"
+    sys.path.insert(0, str(project_root / "src"))
+    from confidence_calibration import ConfidenceCalibrator
 
 logger = logging.getLogger(__name__)
 
@@ -54,7 +66,8 @@ class AnswerGenerator:
         fallback_model: str = "mistral:latest",
         temperature: float = 0.3,
         max_tokens: int = 1024,
-        stream: bool = True
+        stream: bool = True,
+        enable_calibration: bool = True
     ):
         """
         Initialize the answer generator.
@@ -65,6 +78,7 @@ class AnswerGenerator:
             temperature: Generation temperature (0.0-1.0)
             max_tokens: Maximum tokens to generate
             stream: Whether to stream responses
+            enable_calibration: Whether to enable confidence calibration
         """
         self.primary_model = primary_model
         self.fallback_model = fallback_model
@@ -72,6 +86,17 @@ class AnswerGenerator:
         self.max_tokens = max_tokens
         self.stream = stream
         self.client = ollama.Client()
+        
+        # Initialize confidence calibration
+        self.enable_calibration = enable_calibration
+        self.calibrator = None
+        if enable_calibration:
+            try:
+                self.calibrator = ConfidenceCalibrator()
+                logger.info("Confidence calibration enabled")
+            except Exception as e:
+                logger.warning(f"Failed to initialize calibration: {e}")
+                self.enable_calibration = False
         
         # Verify models are available
         self._verify_models()
@@ -335,7 +360,90 @@ TECHNICAL DOCUMENTATION RULES:
             # This is a high-quality response scenario
             confidence += 0.15
         
-        return min(confidence, 0.95)  # Cap at 95% to maintain some uncertainty
+        raw_confidence = min(confidence, 0.95)  # Cap at 95% to maintain some uncertainty
+        
+        # Apply temperature scaling calibration if available
+        if self.enable_calibration and self.calibrator and self.calibrator.is_fitted:
+            try:
+                calibrated_confidence = self.calibrator.calibrate_confidence(raw_confidence)
+                logger.debug(f"Confidence calibrated: {raw_confidence:.3f} -> {calibrated_confidence:.3f}")
+                return calibrated_confidence
+            except Exception as e:
+                logger.warning(f"Calibration failed, using raw confidence: {e}")
+                
+        return raw_confidence
+    
+    def fit_calibration(self, validation_data: List[Dict[str, Any]]) -> float:
+        """
+        Fit temperature scaling calibration using validation data.
+        
+        Args:
+            validation_data: List of dicts with 'confidence' and 'correctness' keys
+            
+        Returns:
+            Optimal temperature parameter
+        """
+        if not self.enable_calibration or not self.calibrator:
+            logger.warning("Calibration not enabled or not available")
+            return 1.0
+            
+        try:
+            confidences = [item['confidence'] for item in validation_data]
+            correctness = [item['correctness'] for item in validation_data]
+            
+            optimal_temp = self.calibrator.fit_temperature_scaling(confidences, correctness)
+            logger.info(f"Calibration fitted with temperature: {optimal_temp:.3f}")
+            return optimal_temp
+            
+        except Exception as e:
+            logger.error(f"Failed to fit calibration: {e}")
+            return 1.0
+    
+    def save_calibration(self, filepath: str) -> bool:
+        """Save fitted calibration to file."""
+        if not self.calibrator or not self.calibrator.is_fitted:
+            logger.warning("No fitted calibration to save")
+            return False
+            
+        try:
+            calibration_data = {
+                'temperature': self.calibrator.temperature,
+                'is_fitted': self.calibrator.is_fitted,
+                'model_info': {
+                    'primary_model': self.primary_model,
+                    'fallback_model': self.fallback_model
+                }
+            }
+            
+            with open(filepath, 'w') as f:
+                json.dump(calibration_data, f, indent=2)
+            
+            logger.info(f"Calibration saved to {filepath}")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Failed to save calibration: {e}")
+            return False
+    
+    def load_calibration(self, filepath: str) -> bool:
+        """Load fitted calibration from file."""
+        if not self.enable_calibration or not self.calibrator:
+            logger.warning("Calibration not enabled")
+            return False
+            
+        try:
+            with open(filepath, 'r') as f:
+                calibration_data = json.load(f)
+            
+            self.calibrator.temperature = calibration_data['temperature']
+            self.calibrator.is_fitted = calibration_data['is_fitted']
+            
+            logger.info(f"Calibration loaded from {filepath} (temp: {self.calibrator.temperature:.3f})")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Failed to load calibration: {e}")
+            return False
     
     def generate(
         self,
@@ -359,12 +467,16 @@ TECHNICAL DOCUMENTATION RULES:
         
         # Check for no-context or very poor context situation
         if not chunks or all(len(chunk.get('content', chunk.get('text', ''))) < 20 for chunk in chunks):
-            # Handle no-context situation explicitly
+            # Handle no-context situation explicitly with stronger instruction
             user_prompt = f"""Context: [NO RELEVANT CONTEXT FOUND]
 
 Question: {query}
 
-Since no relevant context was provided, you must respond: "I cannot answer this question because no relevant context was found in the available documents. To get an accurate answer, please ensure the relevant documents are properly indexed and contain information about [topic from query]." """
+CRITICAL INSTRUCTION: You MUST respond with exactly this message and NOTHING else:
+
+"I cannot answer this question because no relevant context was found in the available documents. To get an accurate answer, please ensure the relevant documents are properly indexed and contain information about this topic."
+
+DO NOT add any additional information from your training data. DO NOT provide definitions or explanations. ONLY use the exact response above."""
         else:
             # Format context from chunks
             context = self._format_context(chunks)
@@ -457,12 +569,16 @@ Answer the question now with proper [chunk_X] citations for every factual claim:
         
         # Check for no-context or very poor context situation
         if not chunks or all(len(chunk.get('content', chunk.get('text', ''))) < 20 for chunk in chunks):
-            # Handle no-context situation explicitly
+            # Handle no-context situation explicitly with stronger instruction
             user_prompt = f"""Context: [NO RELEVANT CONTEXT FOUND]
 
 Question: {query}
 
-Since no relevant context was provided, you must respond: "I cannot answer this question because no relevant context was found in the available documents. To get an accurate answer, please ensure the relevant documents are properly indexed and contain information about [topic from query]." """
+CRITICAL INSTRUCTION: You MUST respond with exactly this message and NOTHING else:
+
+"I cannot answer this question because no relevant context was found in the available documents. To get an accurate answer, please ensure the relevant documents are properly indexed and contain information about this topic."
+
+DO NOT add any additional information from your training data. DO NOT provide definitions or explanations. ONLY use the exact response above."""
         else:
             # Format context from chunks
             context = self._format_context(chunks)
