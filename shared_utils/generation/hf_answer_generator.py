@@ -91,6 +91,7 @@ class HuggingFaceAnswerGenerator:
         
         # Prepare headers
         self.headers = {"Content-Type": "application/json"}
+        self._auth_failed = False  # Track if auth has failed
         if self.api_token:
             self.headers["Authorization"] = f"Bearer {self.api_token}"
             logger.info("Using authenticated HuggingFace API")
@@ -104,6 +105,35 @@ class HuggingFaceAnswerGenerator:
             "facebook/bart-base",               # Base BART - works but needs right format
         ]
     
+    def _make_api_request(self, url: str, payload: dict, timeout: int = 30) -> requests.Response:
+        """Make API request with automatic 401 handling."""
+        # Use current headers (may have been updated if auth failed)
+        headers = self.headers.copy()
+        
+        # If we've already had auth failure, don't include the token
+        if self._auth_failed and "Authorization" in headers:
+            del headers["Authorization"]
+        
+        response = requests.post(url, headers=headers, json=payload, timeout=timeout)
+        
+        # Handle 401 error
+        if response.status_code == 401 and not self._auth_failed and self.api_token:
+            logger.error(f"API request failed: 401 Unauthorized")
+            logger.error(f"Response body: {response.text}")
+            logger.warning("Token appears invalid, retrying without authentication...")
+            self._auth_failed = True
+            # Remove auth header
+            if "Authorization" in self.headers:
+                del self.headers["Authorization"]
+            headers = self.headers.copy()
+            # Retry without auth
+            response = requests.post(url, headers=headers, json=payload, timeout=timeout)
+            if response.status_code == 401:
+                logger.error("Still getting 401 even without auth token")
+                logger.error(f"Response body: {response.text}")
+            
+        return response
+    
     def _call_api_with_model(self, prompt: str, model_name: str) -> str:
         """Call API with a specific model (for fallback support)."""
         fallback_url = f"https://api-inference.huggingface.co/models/{model_name}"
@@ -111,12 +141,8 @@ class HuggingFaceAnswerGenerator:
         # SIMPLIFIED payload that works
         payload = {"inputs": prompt}
         
-        response = requests.post(
-            fallback_url,
-            headers=self.headers,
-            json=payload,
-            timeout=30
-        )
+        # Use helper method with 401 handling
+        response = self._make_api_request(fallback_url, payload)
         
         response.raise_for_status()
         result = response.json()
@@ -274,12 +300,8 @@ Be direct, confident, and accurate. If the context answers the question, provide
             logger.info(f"Headers: {self.headers}")
             logger.info(f"Payload: {payload}")
             
-            response = requests.post(
-                self.api_url,
-                headers=self.headers,
-                json=payload,
-                timeout=30
-            )
+            # Use helper method with 401 handling
+            response = self._make_api_request(self.api_url, payload)
             
             logger.info(f"Response status: {response.status_code}")
             logger.info(f"Response headers: {response.headers}")
@@ -289,15 +311,10 @@ Be direct, confident, and accurate. If the context answers the question, provide
                 logger.warning("Model loading, waiting 20 seconds...")
                 import time
                 time.sleep(20)
-                response = requests.post(
-                    self.api_url,
-                    headers=self.headers,
-                    json=payload,
-                    timeout=30
-                )
+                response = self._make_api_request(self.api_url, payload)
                 logger.info(f"Retry response status: {response.status_code}")
             
-            if response.status_code == 404:
+            elif response.status_code == 404:
                 logger.error(f"Model not found: {self.model_name}")
                 logger.error(f"Response text: {response.text}")
                 # Try fallback models
