@@ -17,13 +17,10 @@ import sys
 
 # Import calibration framework
 try:
-    # Try relative import first
-    from ...project_1_technical_rag.src.confidence_calibration import ConfidenceCalibrator
+    from src.confidence_calibration import ConfidenceCalibrator
 except ImportError:
-    # Fallback to absolute import
-    project_root = Path(__file__).parent.parent.parent / "project-1-technical-rag"
-    sys.path.insert(0, str(project_root / "src"))
-    from confidence_calibration import ConfidenceCalibrator
+    # Fallback - disable calibration for deployment
+    ConfidenceCalibrator = None
 
 logger = logging.getLogger(__name__)
 
@@ -90,13 +87,16 @@ class AnswerGenerator:
         # Initialize confidence calibration
         self.enable_calibration = enable_calibration
         self.calibrator = None
-        if enable_calibration:
+        if enable_calibration and ConfidenceCalibrator is not None:
             try:
                 self.calibrator = ConfidenceCalibrator()
                 logger.info("Confidence calibration enabled")
             except Exception as e:
                 logger.warning(f"Failed to initialize calibration: {e}")
                 self.enable_calibration = False
+        elif enable_calibration and ConfidenceCalibrator is None:
+            logger.warning("Calibration requested but ConfidenceCalibrator not available - disabling")
+            self.enable_calibration = False
         
         # Verify models are available
         self._verify_models()
