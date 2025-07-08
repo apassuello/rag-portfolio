@@ -48,7 +48,7 @@ class TechnicalPromptTemplates:
         """Get the base system prompt for technical documentation."""
         return """You are an expert technical documentation assistant specializing in embedded systems, 
 RISC-V architecture, RTOS, and embedded AI/ML. Your role is to provide accurate, detailed 
-technical answers based strictly on the provided documentation context.
+technical answers based strictly on the provided context.
 
 Key responsibilities:
 1. Answer questions using ONLY information from the provided context
@@ -58,7 +58,7 @@ Key responsibilities:
 5. Clearly state when information is not available in the context
 6. Consider hardware constraints and embedded system limitations when relevant
 
-Never make up information. If the context doesn't contain the answer, say so explicitly."""
+Write naturally and conversationally. Avoid repetitive phrases and numbered lists unless specifically requested. Never make up information. If the context doesn't contain the answer, say so explicitly."""
 
     @staticmethod
     def get_definition_template() -> PromptTemplate:
@@ -79,11 +79,7 @@ For definition queries, focus on:
 
 Provide a comprehensive technical definition with proper citations.""",
             
-            answer_guidelines="""Structure your answer as:
-1. Primary definition [chunk_X]
-2. Technical details and specifications [chunk_Y]
-3. Related concepts or applications [chunk_Z]
-4. Any relevant acronyms or abbreviations""",
+            answer_guidelines="""Provide a clear, comprehensive answer that directly addresses the question. Include relevant technical details and cite your sources using [chunk_X] notation. Make your response natural and conversational while maintaining technical accuracy.""",
             
             few_shot_examples=[
                 """Q: What is RISC-V?
@@ -356,12 +352,7 @@ Provide diagnostic steps and solutions.""",
 
 Provide a comprehensive technical answer based on the documentation.""",
             
-            answer_guidelines="""Provide a clear, well-structured answer that:
-1. Directly addresses the question
-2. Includes all relevant technical details
-3. Cites sources using [chunk_X] notation
-4. Maintains technical accuracy
-5. Acknowledges any limitations in available information"""
+            answer_guidelines="""Provide a clear, comprehensive answer that directly addresses the question. Include relevant technical details and cite your sources using [chunk_X] notation. Write naturally and conversationally while maintaining technical accuracy. Acknowledge any limitations in available information."""
         )
     
     @staticmethod

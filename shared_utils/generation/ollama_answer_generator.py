@@ -321,26 +321,14 @@ Answer:"""
             )
             citations.append(citation)
 
-            # Map chunk reference to natural source name
-            source_name = chunk.get("metadata", {}).get("source", "unknown")
-            if source_name != "unknown":
-                natural_name = (
-                    Path(source_name).stem.replace("-", " ").replace("_", " ")
-                )
-                chunk_to_source[f"[chunk_{idx+1}]"] = (
-                    f"the {natural_name} documentation"
-                )
-            else:
-                chunk_to_source[f"[chunk_{idx+1}]"] = "the documentation"
+            # Don't replace chunk references - keep them as proper citations
+            # The issue was that replacing [chunk_X] with "the documentation" creates repetitive text
+            # Instead, we should keep the proper citation format
+            pass
 
-        # Replace [chunk_X] with natural references
-        natural_answer = answer
-        for chunk_ref, natural_ref in chunk_to_source.items():
-            natural_answer = natural_answer.replace(chunk_ref, natural_ref)
-
-        # Clean up any remaining unreferenced citations
-        natural_answer = re.sub(r"\[chunk_\d+\]", "the documentation", natural_answer)
-        natural_answer = re.sub(r"\s+", " ", natural_answer).strip()
+        # Keep the answer as-is with proper [chunk_X] citations
+        # Don't replace citations with repetitive text
+        natural_answer = re.sub(r"\s+", " ", answer).strip()
 
         return natural_answer, citations
 
