@@ -20,8 +20,21 @@ from dataclasses import dataclass
 from .hf_answer_generator import Citation, GeneratedAnswer
 from .prompt_templates import TechnicalPromptTemplates
 
+# Import standard interfaces (add this for the adapter)
+try:
+    from pathlib import Path
+    import sys
+    project_root = Path(__file__).parent.parent.parent.parent.parent
+    sys.path.append(str(project_root))
+    from src.core.interfaces import Document, Answer, AnswerGenerator
+except ImportError:
+    # Fallback for standalone usage
+    Document = None
+    Answer = None
+    AnswerGenerator = object
 
-class OllamaAnswerGenerator:
+
+class OllamaAnswerGenerator(AnswerGenerator if AnswerGenerator != object else object):
     """
     Generates answers using local Ollama server.
 
@@ -364,7 +377,40 @@ Answer:"""
 
         return min(confidence, 0.95)  # Cap at 95%
 
-    def generate(self, query: str, chunks: List[Dict[str, Any]]) -> GeneratedAnswer:
+    def generate(self, query: str, context: List[Document]) -> Answer:
+        """
+        Generate an answer from query and context documents (standard interface).
+        
+        This is the public interface that conforms to the AnswerGenerator protocol.
+        It handles the conversion between standard Document objects and Ollama's
+        internal chunk format.
+        
+        Args:
+            query: User's question
+            context: List of relevant Document objects
+            
+        Returns:
+            Answer object conforming to standard interface
+            
+        Raises:
+            ValueError: If query is empty or context is None
+        """
+        if not query.strip():
+            raise ValueError("Query cannot be empty")
+        
+        if context is None:
+            raise ValueError("Context cannot be None")
+        
+        # Internal adapter: Convert Documents to Ollama chunk format
+        ollama_chunks = self._documents_to_ollama_chunks(context)
+        
+        # Use existing Ollama-specific generation logic
+        ollama_result = self._generate_internal(query, ollama_chunks)
+        
+        # Internal adapter: Convert Ollama result to standard Answer
+        return self._ollama_result_to_answer(ollama_result, context)
+    
+    def _generate_internal(self, query: str, chunks: List[Dict[str, Any]]) -> GeneratedAnswer:
         """
         Generate an answer based on the query and retrieved chunks.
 
@@ -492,6 +538,82 @@ Answer:"""
             generation_time=generation_time,
             model_used=self.model_name,
             context_used=chunks,
+        )
+    
+    def _documents_to_ollama_chunks(self, documents: List[Document]) -> List[Dict[str, Any]]:
+        """
+        Convert Document objects to Ollama's internal chunk format.
+        
+        This internal adapter ensures that Document objects are properly formatted
+        for Ollama's processing pipeline while keeping the format requirements
+        encapsulated within this class.
+        
+        Args:
+            documents: List of Document objects from the standard interface
+            
+        Returns:
+            List of chunk dictionaries in Ollama's expected format
+        """
+        if not documents:
+            return []
+        
+        chunks = []
+        for i, doc in enumerate(documents):
+            chunk = {
+                "id": f"chunk_{i+1}",
+                "content": doc.content,  # Ollama expects "content" field
+                "text": doc.content,    # Fallback field for compatibility
+                "score": 1.0,           # Default relevance score
+                "metadata": {
+                    "source": doc.metadata.get("source", "unknown"),
+                    "page_number": doc.metadata.get("start_page", 1),
+                    **doc.metadata  # Include all original metadata
+                }
+            }
+            chunks.append(chunk)
+        
+        return chunks
+    
+    def _ollama_result_to_answer(self, ollama_result: GeneratedAnswer, original_context: List[Document]) -> Answer:
+        """
+        Convert Ollama's GeneratedAnswer to the standard Answer format.
+        
+        This internal adapter converts Ollama's result format back to the
+        standard interface format expected by the rest of the system.
+        
+        Args:
+            ollama_result: Result from Ollama's internal generation
+            original_context: Original Document objects for sources
+            
+        Returns:
+            Answer object conforming to standard interface
+        """
+        if not Answer:
+            # Fallback if standard interface not available
+            return ollama_result
+        
+        # Convert to standard Answer format
+        return Answer(
+            text=ollama_result.answer,
+            sources=original_context,  # Use original Document objects
+            confidence=ollama_result.confidence_score,
+            metadata={
+                "model_used": ollama_result.model_used,
+                "generation_time": ollama_result.generation_time,
+                "citations": [
+                    {
+                        "chunk_id": cit.chunk_id,
+                        "page_number": cit.page_number,
+                        "source_file": cit.source_file,
+                        "relevance_score": cit.relevance_score,
+                        "text_snippet": cit.text_snippet
+                    }
+                    for cit in ollama_result.citations
+                ],
+                "provider": "ollama",
+                "temperature": self.temperature,
+                "max_tokens": self.max_tokens
+            }
         )
 
 
