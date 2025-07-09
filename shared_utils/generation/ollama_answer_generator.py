@@ -216,7 +216,7 @@ class OllamaAnswerGenerator(AnswerGenerator if AnswerGenerator != object else ob
         return "\n---\n".join(context_parts)
 
     def _create_prompt(self, query: str, context: str, chunks: List[Dict[str, Any]]) -> str:
-        """Create optimized prompt using TechnicalPromptTemplates."""
+        """Create optimized prompt with dynamic length constraints and citation instructions."""
         # Get the appropriate template based on query type
         prompt_data = TechnicalPromptTemplates.format_prompt_with_template(
             query=query, context=context
@@ -233,6 +233,10 @@ class OllamaAnswerGenerator(AnswerGenerator if AnswerGenerator != object else ob
             citation_example = "RISC-V is an open-source ISA [chunk_1] that supports multiple data widths [chunk_2]."
         else:
             citation_example = "RISC-V is an open-source ISA [chunk_1] that supports multiple data widths [chunk_2] and provides extensions [chunk_3]."
+
+        # Determine optimal answer length based on query complexity
+        target_length = self._determine_target_length(query, chunks)
+        length_instruction = self._create_length_instruction(target_length)
         
         # Format for different model types
         if "llama" in self.model_name.lower():
@@ -246,10 +250,13 @@ MANDATORY CITATION RULES:
 - Every technical claim MUST have a citation from available chunks
 - Example: "{citation_example}"
 
+{length_instruction}
+
 <|eot_id|><|start_header_id|>user<|end_header_id|>
 {prompt_data['user']}
 
-CRITICAL: You MUST cite sources ONLY from available chunks: {available_chunks}. DO NOT use chunk numbers > {num_chunks}.<|eot_id|><|start_header_id|>assistant<|end_header_id|>"""
+CRITICAL: You MUST cite sources ONLY from available chunks: {available_chunks}. DO NOT use chunk numbers > {num_chunks}.
+{length_instruction}<|eot_id|><|start_header_id|>assistant<|end_header_id|>"""
 
         elif "mistral" in self.model_name.lower():
             # Mistral format with technical templates
@@ -260,7 +267,8 @@ Context:
 
 Question: {query}
 
-MANDATORY: ONLY use available chunks: {available_chunks}. DO NOT cite chunk numbers > {num_chunks}. [/INST]"""
+MANDATORY: ONLY use available chunks: {available_chunks}. DO NOT cite chunk numbers > {num_chunks}.
+{length_instruction} [/INST]"""
 
         else:
             # Generic format with technical templates
@@ -272,8 +280,61 @@ Context:
 Question: {query}
 
 MANDATORY CITATIONS: ONLY use available chunks: {available_chunks}. DO NOT cite chunk numbers > {num_chunks}.
+{length_instruction}
 
 Answer:"""
+    
+    def _determine_target_length(self, query: str, chunks: List[Dict[str, Any]]) -> int:
+        """
+        Determine optimal answer length based on query complexity.
+        
+        Target range: 150-400 characters (down from 1000-2600)
+        """
+        # Analyze query complexity
+        query_length = len(query)
+        query_words = len(query.split())
+        
+        # Check for complexity indicators
+        complex_words = [
+            "explain", "describe", "analyze", "compare", "contrast", 
+            "evaluate", "discuss", "detail", "elaborate", "comprehensive"
+        ]
+        
+        simple_words = [
+            "what", "define", "list", "name", "identify", "is", "are"
+        ]
+        
+        query_lower = query.lower()
+        is_complex = any(word in query_lower for word in complex_words)
+        is_simple = any(word in query_lower for word in simple_words)
+        
+        # Base length from query type
+        if is_complex:
+            base_length = 350  # Complex queries get longer answers
+        elif is_simple:
+            base_length = 200  # Simple queries get shorter answers
+        else:
+            base_length = 275  # Default middle ground
+        
+        # Adjust based on available context
+        context_factor = min(len(chunks) * 25, 75)  # More context allows longer answers
+        
+        # Adjust based on query length
+        query_factor = min(query_words * 5, 50)  # Longer queries allow longer answers
+        
+        target_length = base_length + context_factor + query_factor
+        
+        # Constrain to target range
+        return max(150, min(target_length, 400))
+    
+    def _create_length_instruction(self, target_length: int) -> str:
+        """Create length instruction based on target length."""
+        if target_length <= 200:
+            return f"ANSWER LENGTH: Keep your answer concise and focused, approximately {target_length} characters. Be direct and to the point."
+        elif target_length <= 300:
+            return f"ANSWER LENGTH: Provide a clear and informative answer, approximately {target_length} characters. Include key details but avoid unnecessary elaboration."
+        else:
+            return f"ANSWER LENGTH: Provide a comprehensive but concise answer, approximately {target_length} characters. Include important details while maintaining clarity."
 
     def _call_ollama(self, prompt: str) -> str:
         """Call Ollama API for generation."""
@@ -361,34 +422,157 @@ Answer:"""
     def _calculate_confidence(
         self, answer: str, citations: List[Citation], chunks: List[Dict[str, Any]]
     ) -> float:
-        """Calculate confidence score."""
+        """
+        Calculate confidence score with expanded multi-factor assessment.
+        
+        Enhanced algorithm expands range from 0.75-0.95 to 0.3-0.9 with:
+        - Context quality assessment
+        - Citation quality evaluation
+        - Semantic relevance scoring
+        - Off-topic detection
+        - Answer completeness analysis
+        """
         if not answer or len(answer.strip()) < 10:
             return 0.1
 
-        # Base confidence from content quality
-        if len(chunks) >= 3:
-            confidence = 0.8
-        elif len(chunks) >= 2:
-            confidence = 0.7
-        else:
-            confidence = 0.6
-
-        # Citation bonus
-        if citations and chunks:
-            citation_ratio = len(citations) / min(len(chunks), 3)
-            confidence += 0.15 * citation_ratio
-
-        # Uncertainty penalty
+        # 1. Context Quality Assessment (0.3-0.6 base range)
+        context_quality = self._assess_context_quality(chunks)
+        
+        # 2. Citation Quality Evaluation (0.0-0.2 boost)
+        citation_quality = self._assess_citation_quality(citations, chunks)
+        
+        # 3. Semantic Relevance Scoring (0.0-0.15 boost)
+        semantic_relevance = self._assess_semantic_relevance(answer, chunks)
+        
+        # 4. Off-topic Detection (-0.4 penalty if off-topic)
+        off_topic_penalty = self._detect_off_topic(answer, chunks)
+        
+        # 5. Answer Completeness Analysis (0.0-0.1 boost)
+        completeness_bonus = self._assess_answer_completeness(answer, len(chunks))
+        
+        # Combine all factors
+        confidence = (
+            context_quality + 
+            citation_quality + 
+            semantic_relevance + 
+            completeness_bonus + 
+            off_topic_penalty
+        )
+        
+        # Apply uncertainty penalty
         uncertainty_phrases = [
             "insufficient information",
-            "cannot determine",
+            "cannot determine", 
             "not available in the provided documents",
+            "I don't have enough context",
+            "the context doesn't seem to provide"
         ]
-
+        
         if any(phrase in answer.lower() for phrase in uncertainty_phrases):
-            confidence *= 0.3
-
-        return min(confidence, 0.95)  # Cap at 95%
+            confidence *= 0.4  # Stronger penalty for uncertainty
+        
+        # Constrain to target range 0.3-0.9
+        return max(0.3, min(confidence, 0.9))
+    
+    def _assess_context_quality(self, chunks: List[Dict[str, Any]]) -> float:
+        """Assess quality of context chunks (0.3-0.6 range)."""
+        if not chunks:
+            return 0.3
+        
+        # Base score from chunk count
+        if len(chunks) >= 3:
+            base_score = 0.6
+        elif len(chunks) >= 2:
+            base_score = 0.5
+        else:
+            base_score = 0.4
+        
+        # Quality adjustments based on chunk content
+        avg_chunk_length = sum(len(chunk.get("content", chunk.get("text", ""))) for chunk in chunks) / len(chunks)
+        
+        if avg_chunk_length > 500:  # Rich content
+            base_score += 0.05
+        elif avg_chunk_length < 100:  # Sparse content
+            base_score -= 0.05
+        
+        return max(0.3, min(base_score, 0.6))
+    
+    def _assess_citation_quality(self, citations: List[Citation], chunks: List[Dict[str, Any]]) -> float:
+        """Assess citation quality (0.0-0.2 range)."""
+        if not citations or not chunks:
+            return 0.0
+        
+        # Citation coverage bonus
+        citation_ratio = len(citations) / min(len(chunks), 3)
+        coverage_bonus = 0.1 * citation_ratio
+        
+        # Citation diversity bonus (multiple sources)
+        unique_sources = len(set(cit.source_file for cit in citations))
+        diversity_bonus = 0.05 * min(unique_sources / max(len(chunks), 1), 1.0)
+        
+        return min(coverage_bonus + diversity_bonus, 0.2)
+    
+    def _assess_semantic_relevance(self, answer: str, chunks: List[Dict[str, Any]]) -> float:
+        """Assess semantic relevance between answer and context (0.0-0.15 range)."""
+        if not answer or not chunks:
+            return 0.0
+        
+        # Simple keyword overlap assessment
+        answer_words = set(answer.lower().split())
+        context_words = set()
+        
+        for chunk in chunks:
+            chunk_text = chunk.get("content", chunk.get("text", ""))
+            context_words.update(chunk_text.lower().split())
+        
+        if not context_words:
+            return 0.0
+        
+        # Calculate overlap ratio
+        overlap = len(answer_words & context_words)
+        total_unique = len(answer_words | context_words)
+        
+        if total_unique == 0:
+            return 0.0
+        
+        overlap_ratio = overlap / total_unique
+        return min(0.15 * overlap_ratio, 0.15)
+    
+    def _detect_off_topic(self, answer: str, chunks: List[Dict[str, Any]]) -> float:
+        """Detect if answer is off-topic (-0.4 penalty if off-topic)."""
+        if not answer or not chunks:
+            return 0.0
+        
+        # Check for off-topic indicators
+        off_topic_phrases = [
+            "but I have to say that the context doesn't seem to provide",
+            "these documents appear to be focused on",
+            "but they don't seem to cover",
+            "I'd recommend consulting a different type of documentation",
+            "without more context or information"
+        ]
+        
+        answer_lower = answer.lower()
+        for phrase in off_topic_phrases:
+            if phrase in answer_lower:
+                return -0.4  # Strong penalty for off-topic responses
+        
+        return 0.0
+    
+    def _assess_answer_completeness(self, answer: str, chunk_count: int) -> float:
+        """Assess answer completeness (0.0-0.1 range)."""
+        if not answer:
+            return 0.0
+        
+        # Length-based completeness assessment
+        answer_length = len(answer)
+        
+        if answer_length > 500:  # Comprehensive answer
+            return 0.1
+        elif answer_length > 200:  # Adequate answer
+            return 0.05
+        else:  # Brief answer
+            return 0.0
 
     def generate(self, query: str, context: List[Document]) -> Answer:
         """
