@@ -529,18 +529,19 @@ class OllamaAnswerGenerator:
 
 **Step 1: Read Essential Documentation**
 ```bash
-# Required Reading (CURRENT)
+# Required Reading (CURRENT) - PRIMARY REFERENCES
 1. /Users/apa/ml_projects/rag-portfolio/CLAUDE.md (this file)
-2. /Users/apa/ml_projects/rag-portfolio/project-1-technical-rag/PHASE6_VALIDATION_REPORT.md
-3. /Users/apa/ml_projects/rag-portfolio/project-1-technical-rag/docs/ADAPTER_PATTERN_ARCHITECTURE_REPORT.md
-4. /Users/apa/ml_projects/rag-portfolio/project-1-technical-rag/current_plan.md
-5. /Users/apa/ml_projects/rag-portfolio/project-1-technical-rag/tests/CLAUDE_CODE_TESTING_GUIDE.md
-6. /Users/apa/ml_projects/rag-portfolio/project-1-technical-rag/docs/rag-architecture-requirements.md
-7. /Users/apa/ml_projects/rag-portfolio/project-1-technical-rag/docs/project_initial_doc/project-1-technical-rag.md
+2. /Users/apa/ml_projects/rag-portfolio/project-1-technical-rag/docs/SOFTWARE_ARCHITECTURE_DOCUMENT.md
+3. /Users/apa/ml_projects/rag-portfolio/project-1-technical-rag/docs/CONSOLIDATED_ARCHITECTURE_SUMMARY.md
+4. /Users/apa/ml_projects/rag-portfolio/project-1-technical-rag/docs/ADAPTER_PATTERN_ARCHITECTURE_REPORT.md
+5. /Users/apa/ml_projects/rag-portfolio/project-1-technical-rag/current_plan.md
+6. /Users/apa/ml_projects/rag-portfolio/project-1-technical-rag/PHASE6_VALIDATION_REPORT.md
+7. /Users/apa/ml_projects/rag-portfolio/project-1-technical-rag/docs/rag-architecture-requirements.md
 
 # Optional Historical Context
-# Phase evolution docs (phase1 through phase5-detailed-design.md) document 
-# the 6-phase architecture evolution - read if deeper historical understanding needed
+# Phase evolution docs now in /docs/archive/phases/ - read if deeper historical understanding needed
+# Component-specific docs in /docs/archive/components/ - read for detailed component design
+# Strategy docs in /docs/archive/strategy/ - read for implementation strategy context
 ```
 
 **Step 2: Execute Diagnostic Tests**
