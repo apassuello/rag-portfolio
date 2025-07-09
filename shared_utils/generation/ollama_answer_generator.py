@@ -215,13 +215,25 @@ class OllamaAnswerGenerator(AnswerGenerator if AnswerGenerator != object else ob
 
         return "\n---\n".join(context_parts)
 
-    def _create_prompt(self, query: str, context: str) -> str:
+    def _create_prompt(self, query: str, context: str, chunks: List[Dict[str, Any]]) -> str:
         """Create optimized prompt using TechnicalPromptTemplates."""
         # Get the appropriate template based on query type
         prompt_data = TechnicalPromptTemplates.format_prompt_with_template(
             query=query, context=context
         )
 
+        # Create dynamic citation instructions based on available chunks
+        num_chunks = len(chunks)
+        available_chunks = ", ".join([f"[chunk_{i+1}]" for i in range(min(num_chunks, 5))])  # Show max 5 examples
+        
+        # Create appropriate example based on actual chunks
+        if num_chunks == 1:
+            citation_example = "RISC-V is an open-source ISA [chunk_1]."
+        elif num_chunks == 2:
+            citation_example = "RISC-V is an open-source ISA [chunk_1] that supports multiple data widths [chunk_2]."
+        else:
+            citation_example = "RISC-V is an open-source ISA [chunk_1] that supports multiple data widths [chunk_2] and provides extensions [chunk_3]."
+        
         # Format for different model types
         if "llama" in self.model_name.lower():
             # Llama-3.2 format with technical prompt templates
@@ -229,14 +241,15 @@ class OllamaAnswerGenerator(AnswerGenerator if AnswerGenerator != object else ob
 {prompt_data['system']}
 
 MANDATORY CITATION RULES:
-- Use [chunk_1], [chunk_2] etc. for ALL factual statements
-- Every technical claim MUST have a citation
-- Example: "RISC-V is an open-source ISA [chunk_1] that supports multiple data widths [chunk_2]."
+- ONLY use available chunks: {available_chunks}
+- You have {num_chunks} chunks available - DO NOT cite chunk numbers higher than {num_chunks}
+- Every technical claim MUST have a citation from available chunks
+- Example: "{citation_example}"
 
 <|eot_id|><|start_header_id|>user<|end_header_id|>
 {prompt_data['user']}
 
-CRITICAL: You MUST cite sources with [chunk_X] format for every fact you state.<|eot_id|><|start_header_id|>assistant<|end_header_id|>"""
+CRITICAL: You MUST cite sources ONLY from available chunks: {available_chunks}. DO NOT use chunk numbers > {num_chunks}.<|eot_id|><|start_header_id|>assistant<|end_header_id|>"""
 
         elif "mistral" in self.model_name.lower():
             # Mistral format with technical templates
@@ -247,7 +260,7 @@ Context:
 
 Question: {query}
 
-MANDATORY: Use [chunk_1], [chunk_2] etc. for ALL factual statements. [/INST]"""
+MANDATORY: ONLY use available chunks: {available_chunks}. DO NOT cite chunk numbers > {num_chunks}. [/INST]"""
 
         else:
             # Generic format with technical templates
@@ -258,7 +271,7 @@ Context:
 
 Question: {query}
 
-MANDATORY CITATIONS: Use [chunk_1], [chunk_2] etc. for every fact.
+MANDATORY CITATIONS: ONLY use available chunks: {available_chunks}. DO NOT cite chunk numbers > {num_chunks}.
 
 Answer:"""
 
@@ -439,8 +452,8 @@ Answer:"""
         # Format context
         context = self._format_context(chunks)
 
-        # Create prompt
-        prompt = self._create_prompt(query, context)
+        # Create prompt with chunks parameter for dynamic citation instructions
+        prompt = self._create_prompt(query, context, chunks)
 
         # Generate answer
         print(
