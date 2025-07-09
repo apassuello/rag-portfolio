@@ -538,10 +538,11 @@ class OllamaAnswerGenerator:
 6. /Users/apa/ml_projects/rag-portfolio/project-1-technical-rag/PHASE6_VALIDATION_REPORT.md
 7. /Users/apa/ml_projects/rag-portfolio/project-1-technical-rag/docs/rag-architecture-requirements.md
 
-# Optional Historical Context
-# Phase evolution docs now in /docs/archive/phases/ - read if deeper historical understanding needed
-# Component-specific docs in /docs/archive/components/ - read for detailed component design
-# Strategy docs in /docs/archive/strategy/ - read for implementation strategy context
+# Historical Context (Comprehensive)
+# Complete evolution journey: /docs/archive/PHASE_EVOLUTION_COMPLETE.md
+# Phase-specific designs: /docs/archive/phases/ (phases 1-6 detailed design + completion reports)
+# Component-specific docs: /docs/archive/components/ (factory, migration, config guides)
+# Strategy docs: /docs/archive/strategy/ (prompt engineering, migration strategies)
 ```
 
 **Step 2: Execute Diagnostic Tests**
