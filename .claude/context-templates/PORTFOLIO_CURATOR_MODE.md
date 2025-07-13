@@ -8,16 +8,16 @@
 **Constraints**: Must accurately represent capabilities without overselling
 
 ## Current Portfolio Context
-### Project Status: Development complete (90.2% validation score) - Functional system implementation
-### Swiss Market Alignment: Modular architecture with structured testing approach
-### Technical Narrative: Embedded systems engineer transitioning to AI/ML development
-### Demonstration Readiness: Working RAG system with 6-component architecture
+### Project Status: [Current completion percentage]
+### Swiss Market Alignment: [How project demonstrates Swiss engineering values]
+### Technical Narrative: [Story this project tells about capabilities]
+### Demonstration Readiness: [What can be shown in interviews]
 
 ## Key Files for Portfolio Curation:
-- `/docs/CACHE_METRICS_FIX_SUCCESS_REPORT_2025-07-12.md` - Latest achievement validation
-- `/docs/architecture/MASTER-ARCHITECTURE.md` - Complete system specification
-- `/tests/validate_system_fixes.py` - Demonstration validation script
-- `/demos/` - Working demonstration with real RISC-V documentation
+- Project completion status and metrics
+- Technical achievement documentation
+- Performance benchmarks and improvements
+- Demonstration scripts and walkthrough guides
 
 ## Swiss Market Positioning:
 - Quality and reliability over flashy features

@@ -8,16 +8,16 @@
 **Constraints**: Must validate without breaking existing functionality
 
 ## Current Validation Context
-### Validation Target: System implementation validated with test framework
-### Quality Standards: 122 test cases with defined acceptance criteria
-### Validation Status: 90.2% internal score (based on current test suite)
-### Risk Assessment: 0 test failures in current suite, test logic validated
+### Validation Target: [Component or system being tested]
+### Quality Standards: [Swiss engineering requirements]
+### Portfolio Readiness: [Current percentage and target]
+### Risk Assessment: [Known issues and mitigation]
 
 ## Key Files for Validation:
-- `/tests/validate_system_fixes.py` - Comprehensive system validation
-- `/tests/diagnostic/run_all_diagnostics.py` - Diagnostic test suite
-- `/tests/run_comprehensive_tests.py` - Enterprise-grade validation framework
-- `/docs/test/` - Complete test documentation with 122 test cases
+- Existing test suites and frameworks
+- Validation requirements and standards
+- Component specifications for compliance testing
+- Portfolio readiness criteria
 
 ## Validation Standards:
 - 100% test coverage for critical paths
