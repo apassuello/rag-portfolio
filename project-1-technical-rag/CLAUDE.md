@@ -1,201 +1,129 @@
-# RAG Portfolio Development Context - Epic 2
+# RAG Portfolio Project 1 - Technical Documentation RAG System
 
-## Project Overview
-Building a 3-project RAG portfolio for ML Engineer positions in Swiss tech market.
-Currently working on **Project 1: Technical Documentation RAG System - Epic 2: Advanced Hybrid Retriever**.
+## **🔄 AFTER AUTOMATIC CONVERSATION COMPACTION**
+**Quick Recovery**: `/restore [work-area]` (epic2-demo | neural-reranker | architecture | testing)  
+**Manual Recovery**: `/context [task-area]` + `/[role] [focus]` + `/status [area]`  
+**Full Guide**: See `POST_COMPACTION_ACTIONS.md` for complete recovery procedures
 
-## Developer Background
-- Arthur Passuello, transitioning from Embedded Systems to AI/ML
-- 2.5 years medical device firmware experience
-- Recent 7-week ML intensive (transformers from scratch, multimodal systems)
-- Strong optimization and production mindset from embedded background
-- Using M4-Pro Apple Silicon Mac with MPS acceleration
+## **Project Overview**
+Building production-ready RAG system for Swiss tech market positioning. **Status: 90.2% validation score, 100% architecture compliance**
 
-## Current Development Environment
-- Python 3.11 in conda environment `rag-portfolio`
-- PyTorch with Metal/MPS support
-- Key libraries: transformers, sentence-transformers, langchain, faiss-cpu
-- **Epic 2 Libraries**: weaviate-client, networkx, plotly, keras/tensorflow
-- IDE: Cursor with AI assistant
-- Git: SSH-based workflow
+### **System Architecture - 6 Components**
+1. **Platform Orchestrator** (`src/core/platform_orchestrator.py`) - System lifecycle and coordination
+2. **Document Processor** (`src/components/processors/`) - PDF ingestion and text processing
+3. **Embedder** (`src/components/embedders/`) - Text vectorization with Apple Silicon MPS
+4. **Retriever** (`src/components/retrievers/`) - Vector search and document retrieval
+5. **Answer Generator** (`src/components/generators/`) - LLM-based response generation
+6. **Query Processor** (`src/components/query_processors/`) - Query workflow orchestration
 
-## Project 1 Technical Stack
-- **Embeddings**: sentence-transformers/all-MiniLM-L6-v2 (local inference)
-- **Vector Store**: FAISS (local) + **Weaviate** (Epic 2 - implemented)
-- **LLM**: Ollama with llama3.2:3b model
-- **Deployment Target**: Streamlit on HuggingFace Spaces
-- **Evaluation**: RAGAS framework
-- **Analytics**: Plotly Dash (Epic 2 - ready)
+### **Epic 2 Enhanced Features**
+- **Neural Reranking**: Cross-encoder models for precision improvement
+- **Graph Enhancement**: Document relationship analysis
+- **Analytics Framework**: Query tracking and performance monitoring
+- **Multi-Backend Support**: FAISS operational, Weaviate ready
 
-## Current Development Status
+### **Performance Baselines**
+- **Document Processing**: 565K chars/sec
+- **Embedding Generation**: 48.7x batch speedup (Apple Silicon MPS)
+- **Retrieval Latency**: <10ms average
+- **Answer Generation**: 1.12s average (target <2s)
 
-### System Foundation (Complete)
-- **6-Component Architecture**: All components implemented with modular design
-- **Validation Score**: 100% portfolio readiness (validated 2025-07-13)
-- **Performance**: 120K embeddings/sec, 45.2 docs/sec processing, <31ms retrieval
-- **Testing**: 122 test cases with 100% end-to-end success rate
+### **Quality Standards - Swiss Engineering**
+- **Test Suite**: 122 test cases with formal acceptance criteria
+- **Validation Score**: 90.2% (internal testing metric)
+- **Architecture Compliance**: 100% modular implementation
+- **Performance Optimization**: Quantified improvements with embedded systems principles
 
-### Epic 2: Advanced Hybrid Retriever - Week 2 Complete ✅
-**Started**: July 13, 2025
-**Duration**: 4-5 weeks (160-200 hours)
-**Current Status**: Week 2 Complete, Ready for Week 3
+## **Key System Files**
 
-#### Epic 2 Objectives
-1. **Weaviate Integration**: ✅ Complete - Alternative vector store with hybrid search
-2. **Knowledge Graph**: ✅ Complete - Document relationship analysis with NetworkX (Week 2)
-3. **Hybrid Search**: ✅ Foundation Complete - Multi-backend architecture implemented
-4. **Neural Reranking**: 🔄 Week 3 Target - Cross-encoder with Keras/TensorFlow
-5. **Analytics Dashboard**: ✅ Foundation Complete - Query tracking operational
-6. **A/B Testing**: ✅ Framework Ready - Configuration system implemented
+### **Configuration**
+- `config/default.yaml` - Basic configuration (ModularUnifiedRetriever)
+- `config/advanced_test.yaml` - Epic 2 configuration (AdvancedRetriever)
 
-#### Week 1 Completed (July 13, 2025) ✅
-- **Weaviate Backend**: Complete adapter implementation (1,040 lines)
-- **FAISS Backend**: Wrapper providing consistent interface (337 lines)
-- **AdvancedRetriever**: Main orchestrator extending ModularUnifiedRetriever (568 lines)
-- **Migration Framework**: Complete FAISS to Weaviate migration (347 lines)
-- **Analytics Foundation**: Query tracking and performance monitoring
-- **ComponentFactory Integration**: Registered as "advanced" type
-- **Configuration System**: Complete YAML-driven configuration
+### **Core System**
+- `src/core/platform_orchestrator.py` - System initialization and orchestration
+- `src/core/component_factory.py` - Component creation with enhanced logging
+- `src/core/interfaces.py` - Component interfaces and contracts
 
-#### Week 2 Completed (July 13, 2025) ✅
-- **Knowledge Graph Construction**: Complete NetworkX-based graph building (702 lines)
-- **Entity Extraction**: spaCy-based RISC-V technical term recognition (518 lines)
-- **Relationship Mapping**: Semantic relationship detection (533 lines)
-- **Graph Retrieval**: Multiple search algorithms (606 lines)
-- **Graph Analytics**: Metrics collection and visualization (500+ lines)
-- **Multi-modal Integration**: Graph as third retrieval strategy operational
-- **Performance Achievement**: All targets exceeded by 100-1000x margins
+### **Validation & Testing**
+- `final_epic2_proof.py` - Epic 2 vs basic component differentiation proof
+- `tests/run_comprehensive_tests.py` - Complete system validation
+- `tests/diagnostic/run_all_diagnostics.py` - System health diagnostics
+- `tests/integration_validation/validate_architecture_compliance.py` - Architecture compliance
 
-## Development Philosophy
-- **Production-first**: Every component deployment-ready
-- **Modular design**: Small, testable, single-purpose functions
-- **Swiss market aligned**: Quality, reliability, thorough documentation
-- **Optimization mindset**: Leverage embedded systems background
-- **Incremental enhancement**: Build on solid foundation
+### **Data**
+- `data/test/` - RISC-V technical documents for testing
+- `cache/` - Document and embedding cache
 
-## Architecture Guidelines for Epic 2
+## **Development Standards**
 
-### Component Structure
+### **Universal Principles**
+- **Swiss Engineering**: Precision, reliability, efficiency in all implementations
+- **Apple Silicon Optimization**: Leverage MPS acceleration where applicable
+- **Modular Architecture**: 6-component system with clear boundaries
+- **Production Quality**: Enterprise-grade error handling and monitoring
+
+### **Code Quality Requirements**
+- **Type Hints**: Complete type annotations
+- **Documentation**: Comprehensive docstrings and API reference
+- **Error Handling**: Graceful degradation and actionable error messages
+- **Performance**: Quantified improvements with benchmarking
+- **Testing**: Corresponding test coverage for all implementations
+
+### **Architecture Patterns**
+- **Adapter Pattern**: External integrations only (PyMuPDF, Ollama)
+- **Direct Implementation**: Internal algorithms and processing
+- **ComponentFactory**: Centralized component creation with caching
+- **Configuration-Driven**: Behavior controlled through YAML configs
+
+## **Context Management System**
+
+### **Role Commands with Focus**
+- `/architect [focus-area]` - Architecture mode with specific focus
+- `/implementer [target]` - Implementation mode for specific target
+- `/optimizer [area]` - Performance optimization for specific area
+- `/validator [test-suite]` - Validation mode for specific test suite
+
+### **Context & Status Commands**
+- `/context [task-area]` - Load context for specific task area
+- `/status [area]` - Show status for specific system area
+
+### **Example Usage**
+```bash
+# Epic 2 Demo Development
+/context epic2-demo         # Load Epic 2 demo context
+/implementer streamlit-ui    # Focus on Streamlit UI implementation
+
+# Neural Reranker Work
+/context neural-reranker     # Load neural reranking context
+/architect component-boundaries  # Review component boundaries
+
+# Testing Work
+/validator diagnostic        # Focus on diagnostic test suite
+/status tests               # Check test suite status
 ```
-src/components/retrievers/
-├── advanced_retriever.py      # New main retriever
-├── backends/                  # Multi-backend support
-│   ├── weaviate_backend.py   # Current implementation focus
-│   └── faiss_backend.py      # Existing, to be wrapped
-├── graph/                     # Document relationships
-├── hybrid/                    # Search strategies
-├── reranking/                # Neural models
-├── analytics/                 # Dashboard
-└── experiments/               # A/B testing
-```
 
-### Design Patterns
-- **Adapter Pattern**: For Weaviate (external service)
-- **Strategy Pattern**: For retrieval backends
-- **Factory Pattern**: Integration with ComponentFactory
-- **Observer Pattern**: For metrics collection
+### **Post-Compaction Recovery**
+- `/restore [work-area]` - Quick context restoration after conversation compaction
 
-### Integration Requirements
-- Extend ModularUnifiedRetriever, don't replace
-- Register in ComponentFactory as "advanced" type
-- Support configuration-driven feature toggles
-- Maintain <700ms P95 latency target
+### **Key Benefits**
+- **No File Bloat**: Commands don't write to files, only load context
+- **Focused Direction**: Target specific work areas with parameters
+- **Clean Sessions**: Each command provides focused context without persistence
+- **Flexible Workflow**: Combine role and focus for precise work direction
+- **Compaction-Safe**: Seamless continuation after automatic conversation compaction
 
-## Key Implementation Files
+## **Current Project State**
+- **Task**: Epic 2 demo enhancement and system refinement
+- **Status**: Production-ready system with comprehensive validation
+- **Next Focus**: Interactive demo development and portfolio presentation
+- **Validation Commands**: All tests passing, architecture compliance validated
 
-### Existing (Reference)
-- `src/components/retrievers/modular_unified_retriever.py` - Base implementation
-- `src/core/interfaces.py` - Retriever interface
-- `src/core/component_factory.py` - Component registration
-- `src/components/generators/answer_generator.py` - Adapter pattern example
+## **Epic 2 Demo Ready**
+System prepared for live demonstration with:
+- **Configuration Toggle**: Basic ↔ Epic 2 switching
+- **Real-time Comparison**: Side-by-side results
+- **Performance Monitoring**: Analytics dashboard
+- **Technical Documentation**: RISC-V corpus for realistic testing
 
-### New (Epic 2)
-- `src/components/retrievers/backends/weaviate_backend.py` - Current focus
-- `src/components/retrievers/backends/weaviate_config.py` - Configuration
-- `src/components/retrievers/backends/migration/faiss_to_weaviate.py` - Migration tools
-
-## Quality Standards
-- **Code**: Type hints, docstrings, error handling
-- **Performance**: Instrumentation on all operations
-- **Testing**: Unit + Integration + Performance tests
-- **Documentation**: API docs + Usage examples
-- **Monitoring**: Metrics collection built-in
-
-## Week 1 Validation Results (July 13, 2025)
-
-### Test Results Summary
-- **System Validation**: 100% PASSED (configuration, initialization, integration)
-- **Advanced Retriever Tests**: 82.6% success rate (19/23 tests passed)
-- **Comprehensive Integration**: 100% success rate (3/3 queries)
-- **Diagnostic Tests**: 100% PASSED (6/6 tests)
-- **Portfolio Readiness**: VALIDATION_COMPLETE (100% score)
-
-### Performance Achievements
-- **Retrieval Latency**: 31ms average (target: <700ms) ✅ EXCEEDED
-- **Document Processing**: 45.2 docs/sec ✅ EXCELLENT
-- **Embedding Generation**: 120,989/sec ✅ EXCELLENT
-- **Query Success Rate**: 100% ✅ PERFECT
-- **Architecture Compliance**: 100% modular ✅ COMPLETE
-
-### Epic 2 Framework Readiness
-- **Neural Reranking**: Configuration ready ✅
-- **Graph Retrieval**: Configuration ready ✅
-- **Analytics Dashboard**: Query tracking operational ✅
-- **A/B Testing**: Configuration ready ✅
-- **Migration Tools**: Fully implemented ✅
-
-## Week 2 Validation Results (July 13, 2025) ✅
-
-### Test Results Summary
-- **Comprehensive Tests**: 100% success rate (3 docs processed, 3 queries tested)
-- **Diagnostic Tests**: STAGING_READY status (80% readiness score, 0 critical issues)
-- **Graph Integration Tests**: 100% success rate (5 entities extracted, 4 nodes created)
-- **Performance Validation**: All targets exceeded by 100-1000x margins
-
-### Performance Achievements (Week 2)
-- **Graph Construction**: 0.016s (target: <10s) - **625x better** ✅ EXCEEDED
-- **Graph Retrieval**: 0.1ms average (target: <100ms) - **1000x better** ✅ EXCEEDED
-- **Entity Extraction**: 160.3 entities/sec (target: >100/sec) - **60% better** ✅ EXCEEDED
-- **Memory Usage**: <0.01MB (target: <500MB) - **Unmeasurable improvement** ✅ EXCEEDED
-- **Success Rate**: 100% (target: >90%) - **Perfect execution** ✅ EXCEEDED
-
-### Documentation Delivered (Week 2)
-- **Architecture Guide**: Complete technical implementation documentation
-- **Test Analysis**: Comprehensive analysis of all test results and performance
-- **Final Report**: Executive summary with production deployment approval
-
-## Week 3 Session Guidelines (Starting July 14, 2025)
-
-### Primary Focus: Neural Reranking
-1. **Cross-encoder Integration**: Implement transformer-based result reranking
-2. **Neural Score Fusion**: Advanced score combination strategies
-3. **Adaptive Reranking**: Query-type aware reranking strategies
-4. **Performance Optimization**: Maintain <700ms P95 latency target
-5. **Quality Enhancement**: Measurable improvement in answer relevance
-
-### Technical Implementation
-1. Create `src/components/retrievers/reranking/` module structure
-2. Implement neural reranker with cross-encoder models
-3. Add adaptive reranking strategies
-4. Design advanced score fusion algorithms
-5. Integrate with AdvancedRetriever framework
-
-### Performance Targets (Week 3)
-- Neural reranking latency: <200ms additional overhead
-- End-to-end latency: <700ms P95 maintained (current: 31ms - large headroom)
-- Quality enhancement: >20% improvement in relevance metrics
-- Memory usage: <1GB additional for cross-encoder models
-
-## Success Criteria Week 3
-- [ ] Cross-encoder neural reranking integration
-- [ ] Query-type adaptive reranking strategies
-- [ ] Advanced neural score fusion with retrieval scores
-- [ ] Performance targets met (<700ms P95)
-- [ ] Quality enhancement validated (>20% improvement)
-
-## Session Memory
-- **Epic 2 Week 1**: COMPLETE ✅ (Multi-backend retriever with Weaviate + FAISS)
-- **Epic 2 Week 2**: COMPLETE ✅ (Knowledge graph construction and graph-based retrieval)
-- **Last achievement**: All Week 2 targets exceeded by unprecedented margins, production deployment approved
-- **Current milestone**: Ready for Week 3 - Neural Reranking
-- **Next session focus**: Cross-encoder models and adaptive reranking strategies
+**Ready for development work with automated context management and Swiss engineering standards.**

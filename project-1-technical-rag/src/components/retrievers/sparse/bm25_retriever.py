@@ -55,12 +55,37 @@ class BM25Retriever(SparseRetriever):
                 - b: Document length normalization factor (default: 0.75)
                 - lowercase: Whether to lowercase text (default: True)
                 - preserve_technical_terms: Whether to preserve technical terms (default: True)
+                - filter_stop_words: Whether to filter common stop words (default: True)
+                - custom_stop_words: Additional stop words to filter (default: empty list)
+                - min_score: Minimum normalized score threshold for results (default: 0.0)
         """
         self.config = config
         self.k1 = config.get("k1", 1.2)
         self.b = config.get("b", 0.75)
         self.lowercase = config.get("lowercase", True)
         self.preserve_technical_terms = config.get("preserve_technical_terms", True)
+        self.filter_stop_words = config.get("filter_stop_words", True)
+        self.custom_stop_words = set(config.get("custom_stop_words", []))
+        self.min_score = config.get("min_score", 0.0)
+        
+        # Standard English stop words for BM25 filtering
+        self.standard_stop_words = {
+            'a', 'an', 'and', 'are', 'as', 'at', 'be', 'by', 'for', 'from', 'has', 'he', 'in', 'is', 'it',
+            'its', 'of', 'on', 'that', 'the', 'to', 'was', 'were', 'will', 'with', 'the', 'this', 'but',
+            'they', 'have', 'had', 'what', 'said', 'each', 'which', 'she', 'do', 'how', 'their', 'if',
+            'up', 'out', 'many', 'then', 'them', 'these', 'so', 'some', 'her', 'would', 'make', 'like',
+            'into', 'him', 'time', 'two', 'more', 'go', 'no', 'way', 'could', 'my', 'than', 'first',
+            'been', 'call', 'who', 'oil', 'sit', 'now', 'find', 'down', 'day', 'did', 'get', 'come',
+            'made', 'may', 'part', 'where', 'much', 'too', 'any', 'after', 'back', 'other', 'see',
+            'want', 'just', 'also', 'when', 'here', 'all', 'well', 'can', 'should', 'must', 'might',
+            'shall', 'about', 'before', 'through', 'over', 'under', 'above', 'below', 'between', 'among'
+        }
+        
+        # Combine standard and custom stop words
+        if self.filter_stop_words:
+            self.stop_words = self.standard_stop_words | self.custom_stop_words
+        else:
+            self.stop_words = self.custom_stop_words
         
         # Validation
         if self.k1 <= 0:
@@ -74,6 +99,10 @@ class BM25Retriever(SparseRetriever):
         self.tokenized_corpus: List[List[str]] = []
         self.chunk_mapping: List[int] = []
         
+        # Deferred indexing control
+        self._index_dirty = False  # Track if index needs rebuilding
+        self._deferred_mode = False  # Enable deferred indexing mode
+        
         # Compile regex patterns for technical term preservation
         if self.preserve_technical_terms:
             self._tech_pattern = re.compile(r'[a-zA-Z0-9][\w\-_.]*[a-zA-Z0-9]|[a-zA-Z0-9]')
@@ -82,7 +111,42 @@ class BM25Retriever(SparseRetriever):
             self._tech_pattern = re.compile(r'\b\w+\b')
             self._punctuation_pattern = re.compile(r'[^\w\s]')
         
-        logger.info(f"BM25Retriever initialized with k1={self.k1}, b={self.b}")
+        logger.info(f"BM25Retriever initialized with k1={self.k1}, b={self.b}, stop_words={len(self.stop_words) if self.stop_words else 0}")
+    
+    def enable_deferred_indexing(self) -> None:
+        """Enable deferred indexing mode to avoid rebuilding index on every batch"""
+        self._deferred_mode = True
+        logger.debug("Deferred indexing mode enabled")
+    
+    def disable_deferred_indexing(self) -> None:
+        """Disable deferred indexing mode and rebuild index if needed"""
+        self._deferred_mode = False
+        if self._index_dirty:
+            self._rebuild_index()
+        logger.debug("Deferred indexing mode disabled")
+    
+    def force_rebuild_index(self) -> None:
+        """Force rebuild the BM25 index with all accumulated documents"""
+        if self.tokenized_corpus:
+            self._rebuild_index()
+        else:
+            logger.warning("No documents to rebuild index")
+    
+    def _rebuild_index(self) -> None:
+        """Internal method to rebuild the BM25 index"""
+        if not self.tokenized_corpus:
+            logger.warning("No tokenized corpus available for index rebuild")
+            return
+        
+        start_time = time.time()
+        self.bm25 = BM25Okapi(self.tokenized_corpus, k1=self.k1, b=self.b)
+        self._index_dirty = False
+        
+        elapsed = time.time() - start_time
+        total_tokens = sum(len(tokens) for tokens in self.tokenized_corpus)
+        valid_doc_count = len([tokens for tokens in self.tokenized_corpus if tokens])
+        
+        logger.info(f"Rebuilt BM25 index with {valid_doc_count} documents in {elapsed:.3f}s")
     
     def index_documents(self, documents: List[Document]) -> None:
         """
@@ -96,33 +160,48 @@ class BM25Retriever(SparseRetriever):
         
         start_time = time.time()
         
-        # Store documents
-        self.documents = documents.copy()
+        # Store documents (extend existing instead of replacing)
+        if not hasattr(self, 'documents') or self.documents is None:
+            self.documents = []
+        if not hasattr(self, 'tokenized_corpus') or self.tokenized_corpus is None:
+            self.tokenized_corpus = []
+        if not hasattr(self, 'chunk_mapping') or self.chunk_mapping is None:
+            self.chunk_mapping = []
         
-        # Extract and preprocess texts
+        # Keep track of starting index for new documents
+        start_idx = len(self.documents)
+        
+        # Add new documents
+        self.documents.extend(documents)
+        
+        # Extract and preprocess texts for new documents only
         texts = [doc.content for doc in documents]
-        self.tokenized_corpus = [self._preprocess_text(text) for text in texts]
+        new_tokenized = [self._preprocess_text(text) for text in texts]
         
-        # Filter out empty tokenized texts and track mapping
-        valid_corpus = []
-        self.chunk_mapping = []
-        
-        for i, tokens in enumerate(self.tokenized_corpus):
+        # Filter out empty tokenized texts and track mapping for new documents
+        for i, tokens in enumerate(new_tokenized):
             if tokens:  # Only include non-empty tokenized texts
-                valid_corpus.append(tokens)
-                self.chunk_mapping.append(i)
+                self.tokenized_corpus.append(tokens)
+                self.chunk_mapping.append(start_idx + i)
         
-        if not valid_corpus:
+        if not self.tokenized_corpus:
             raise ValueError("No valid text content found in documents")
         
-        # Create BM25 index
-        self.bm25 = BM25Okapi(valid_corpus, k1=self.k1, b=self.b)
+        # Rebuild BM25 index unless in deferred mode
+        if self._deferred_mode:
+            # Mark index as dirty but don't rebuild yet
+            self._index_dirty = True
+            logger.debug(f"Added {len(documents)} documents to corpus (deferred mode - index not rebuilt)")
+        else:
+            # Rebuild index immediately (original behavior)
+            self._rebuild_index()
         
         elapsed = time.time() - start_time
         total_tokens = sum(len(tokens) for tokens in self.tokenized_corpus)
         tokens_per_sec = total_tokens / elapsed if elapsed > 0 else 0
         
-        logger.info(f"Indexed {len(documents)} documents ({len(valid_corpus)} valid) in {elapsed:.3f}s")
+        valid_doc_count = len([tokens for tokens in self.tokenized_corpus if tokens])
+        logger.info(f"Indexed {len(documents)} new documents ({valid_doc_count} total valid) in {elapsed:.3f}s")
         logger.debug(f"Processing rate: {tokens_per_sec:.1f} tokens/second")
     
     def search(self, query: str, k: int = 5) -> List[Tuple[int, float]]:
@@ -136,8 +215,13 @@ class BM25Retriever(SparseRetriever):
         Returns:
             List of (document_index, score) tuples sorted by relevance
         """
-        if self.bm25 is None:
-            raise ValueError("Must call index_documents() before searching")
+        # Ensure index is built before searching
+        if self.bm25 is None or self._index_dirty:
+            if self._index_dirty:
+                logger.debug("Rebuilding BM25 index before search (was dirty)")
+                self._rebuild_index()
+            else:
+                raise ValueError("Must call index_documents() before searching")
         
         if not query or not query.strip():
             return []
@@ -169,6 +253,14 @@ class BM25Retriever(SparseRetriever):
             for i in range(len(scores))
         ]
         
+        # Apply minimum score threshold
+        if self.min_score > 0:
+            filtered_results = [(doc_idx, score) for doc_idx, score in results if score >= self.min_score]
+            if not filtered_results:
+                logger.debug(f"No BM25 results above minimum score threshold {self.min_score}")
+                return []
+            results = filtered_results
+        
         # Sort by score (descending) and return top_k
         results.sort(key=lambda x: x[1], reverse=True)
         
@@ -198,6 +290,9 @@ class BM25Retriever(SparseRetriever):
             "b": self.b,
             "lowercase": self.lowercase,
             "preserve_technical_terms": self.preserve_technical_terms,
+            "filter_stop_words": self.filter_stop_words,
+            "stop_words_count": len(self.stop_words) if self.stop_words else 0,
+            "min_score": self.min_score,
             "total_documents": len(self.documents),
             "valid_documents": len(self.chunk_mapping),
             "is_indexed": self.bm25 is not None
@@ -237,6 +332,10 @@ class BM25Retriever(SparseRetriever):
         
         # Filter out single characters and empty strings
         tokens = [token for token in tokens if len(token) > 1]
+        
+        # Filter out stop words if enabled
+        if self.stop_words:
+            tokens = [token for token in tokens if token.lower() not in self.stop_words]
         
         return tokens
     

@@ -22,9 +22,9 @@ embedder:
     batch_processor:
       type: "dynamic"
       config:
-        initial_batch_size: 32
-        max_batch_size: 128
-        optimize_for_memory: true
+        initial_batch_size: 64  # Increased from 32
+        max_batch_size: 256     # Increased from 128
+        optimize_for_memory: false  # Prioritize speed over memory
     cache:
       type: "memory"
       config:
@@ -33,7 +33,7 @@ embedder:
 
 # EPIC 2 ADVANCED RETRIEVER CONFIGURATION
 retriever:
-  type: "advanced"  # Use new Epic 2 Advanced Retriever
+  type: "modular_unified"  # Use ModularUnifiedRetriever with Epic 2 features via advanced config
   config:
     # Backend Configuration
     backends:
@@ -73,88 +73,69 @@ retriever:
       query_dependent_weighting: false
       normalization_method: "min_max"  # "min_max", "z_score", "softmax"
       
-      # Performance optimization
-      max_candidates_per_strategy: 100
+      # Performance optimization - increased for better quality with 4567 chunks
+      max_candidates_per_strategy: 200  # Increased from 100 to get more diverse candidates
       early_termination_threshold: 0.95
 
-    # Neural Reranking Configuration (Framework testing only)
+    # Neural Reranking Configuration (Epic 2 enabled)
     neural_reranking:
-      enabled: false  # Disabled for baseline testing
+      enabled: true  # ENABLED for Epic 2 testing
       
       # Model configuration
       model_name: "cross-encoder/ms-marco-MiniLM-L6-v2"
       model_type: "cross_encoder"
       device: "auto"
       
-      # Reranking parameters
-      max_candidates: 50
+      # Reranking parameters - increased for better quality
+      max_candidates: 100  # Increased from 50 to rerank more candidates
       batch_size: 32
       max_length: 512
       
       # Performance thresholds
-      max_latency_ms: 200
+      max_latency_ms: 5000  # 5 seconds max (within validation limit)
       fallback_to_fast_reranker: true
       fast_reranker_threshold: 100
+      
+      # Enhanced configuration for Epic 2 validation
+      models:
+        default_model:
+          name: "cross-encoder/ms-marco-MiniLM-L6-v2"
+          device: "auto"
+          batch_size: 32
+          max_length: 512
+        # Alternative: HuggingFace API backend (uncomment to use)
+        # api_model:
+        #   name: "cross-encoder/ms-marco-MiniLM-L6-v2"
+        #   backend: "huggingface_api"
+        #   api_token: "${HF_TOKEN}"
+        #   batch_size: 32
+        #   max_length: 512
+        #   timeout: 10
+        #   fallback_to_local: true
+        #   max_candidates: 100
+        #   score_threshold: 0.0
+      default_model: "default_model"  # Change to "api_model" to use HuggingFace API
 
-    # Graph Retrieval Configuration (Epic 2 Week 2)
+    # Graph Retrieval Configuration (Epic 2 - simplified structure)
     graph_retrieval:
       enabled: true  # Enable graph-based retrieval
       
-      # Graph construction
-      builder:
-        implementation: "networkx"
-        config:
-          node_types: ["concept", "protocol", "architecture", "extension"]
-          relationship_types: ["implements", "extends", "requires", "conflicts"]
-          max_graph_size: 10000
-          update_strategy: "incremental"
-          enable_pruning: true
-          pruning_threshold: 0.1
+      # Graph construction - increased for better coverage
+      enable_entity_linking: true
+      enable_cross_references: true
+      similarity_threshold: 0.65  # Lowered from 0.7 to find more connections
+      max_connections_per_document: 15  # Increased from 10
       
-      # Entity extraction
-      entity_extraction:
-        implementation: "spacy"
-        config:
-          model: "en_core_web_sm"
-          entity_types: ["TECH", "PROTOCOL", "ARCH"]
-          confidence_threshold: 0.8
-          batch_size: 32
-          custom_patterns: {}
-          enable_custom_entities: true
+      # Graph algorithms
+      use_pagerank: true
+      pagerank_damping: 0.85
+      use_community_detection: false
+      community_algorithm: "louvain"
       
-      # Relationship detection
-      relationship_detection:
-        implementation: "semantic"
-        config:
-          similarity_threshold: 0.7
-          relationship_model: "sentence_transformer"
-          max_relationships_per_node: 20
-          enable_bidirectional: true
-          weight_decay_factor: 0.9
-      
-      # Graph retrieval algorithms
-      retrieval:
-        algorithms: ["shortest_path", "random_walk", "subgraph_expansion"]
-        max_graph_results: 10
-        max_path_length: 3
-        random_walk_steps: 10
-        subgraph_radius: 2
-        score_aggregation: "weighted_average"
-        enable_path_scoring: true
-      
-      # Graph analytics
-      analytics:
-        enabled: true
-        collect_graph_metrics: true
-        collect_retrieval_metrics: true
-        enable_visualization: false  # Disabled for performance
-        visualization_max_nodes: 100
-        metrics_retention_hours: 24
-      
-      # Performance settings
-      max_memory_mb: 500
-      enable_caching: true
-      cache_size: 1000
+      # Retrieval strategies
+      max_graph_hops: 3
+      graph_weight_decay: 0.5
+      combine_with_vector_search: true
 
     # Analytics Configuration (Enabled for testing)
     analytics:
@@ -207,29 +188,81 @@ retriever:
     enable_caching: true
     cache_size: 1000
 
-    # Feature Flags (Test framework readiness)
-    enable_all_features: false
+    # Feature Flags (Epic 2 enabled)
+    enable_all_features: true
     feature_flags:
-      weaviate_backend: false    # Disabled - no Weaviate server
-      neural_reranking: false    # Framework test only
-      graph_retrieval: false     # Framework test only
-      analytics_dashboard: false # Framework test only
+      weaviate_backend: false    # Disabled - no Weaviate server for testing
+      neural_reranking: true     # ENABLED for Epic 2
+      graph_retrieval: true      # ENABLED for Epic 2
+      analytics_dashboard: true  # ENABLED for Epic 2
       ab_testing: false          # Framework test only
 
-# Answer generation strategy (Same as baseline)
+# Answer generation strategy (Enhanced for technical documentation)
 answer_generator:
   type: "adaptive_modular"
   config:
+    # LLM Client Configuration - Choose between Ollama (local) or HuggingFace (API)
+    llm_client:
+      type: "ollama"  # Options: "ollama", "huggingface"
+      config:
+        # Ollama Configuration (for local LLM)
+        model_name: "llama3.2:3b"
+        base_url: "http://localhost:11434"
+        timeout: 120
+        temperature: 0.3
+        max_tokens: 1024
+        
+        # HuggingFace Configuration (uncomment and set type to "huggingface" above)
+        # api_token: "${HF_TOKEN}"  # Set via environment variable
+        # model_name: "microsoft/DialoGPT-medium"  # or other HF models
+        # use_chat_completion: true
+        # timeout: 30
+        # temperature: 0.3
+        # max_tokens: 1024
+        # fallback_models:
+        #   - "google/gemma-2-2b-it"
+        #   - "Qwen/Qwen2.5-1.5B-Instruct"
+    
+    # Legacy parameters for backward compatibility
     model_name: "llama3.2:3b"
     api_token: null
     temperature: 0.3
-    max_tokens: 512
+    max_tokens: 1024  # Increased from 512 for more comprehensive answers
     use_ollama: true
     ollama_url: "http://localhost:11434"
     use_inference_providers: false
     enable_adaptive_prompts: false
     enable_chain_of_thought: false
     confidence_threshold: 0.85
+    
+    # Enhanced prompt configuration for technical documentation
+    prompt_builder:
+      type: "simple"
+      config:
+        max_context_length: 12000  # Increased from 4000 for more context
+        include_instructions: true
+        citation_style: "inline"
+        template: |
+          You are an expert technical assistant specializing in RISC-V architecture and computer systems.
+          
+          Context Documents:
+          {context}
+          
+          Question: {query}
+          
+          Instructions:
+          - Provide a comprehensive, detailed technical answer based ONLY on the provided context
+          - Include technical specifications, encoding details, and implementation information when available
+          - Explain concepts step-by-step with technical depth appropriate for engineers
+          - Cover related concepts and connections mentioned in the context
+          - Include specific examples, instruction formats, or implementation details when present
+          - Be thorough and detailed - technical documentation requires comprehensive coverage
+          - If multiple aspects are mentioned in the context, address all of them
+          - ALWAYS include citations using [Document X] format after every factual claim
+          - Every technical specification, instruction format, or implementation detail must be cited
+          - Use multiple citations when information comes from several sources: [Document 1, Document 2]
+          
+          Answer:
 
 # Global settings
 global_settings:

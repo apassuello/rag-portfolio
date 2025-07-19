@@ -1,0 +1,131 @@
+graph TD
+    subgraph "Context Loading Flow (/context)"
+        C1[User: /context] --> C2[Read current_plan.md]
+        C2 --> C3[Extract context_requirements]
+        C3 --> C4[Load context fragments]
+        C4 --> C5[Load project-overview.md]
+        C5 --> C6[Assemble context summary]
+        C6 --> C7[Update recent-work.md]
+        C7 --> C8[Display context loaded]
+    end
+    
+    subgraph "Status Check Flow (/status)"
+        S1[User: /status] --> S2[Read current_plan.md]
+        S2 --> S3[Read recent-work.md]
+        S3 --> S4[Execute validation commands]
+        S4 --> S5[Analyze validation results]
+        S5 --> S6[Calculate progress metrics]
+        S6 --> S7[Update validation-results.md]
+        S7 --> S8[Display status report]
+    end
+    
+    subgraph "Role Switching Flow (/architect)"
+        R1[User: /architect] --> R2[Read current_plan.md]
+        R2 --> R3[Load architecture-rules.md]
+        R3 --> R4[Load swiss-engineering.md]
+        R4 --> R5[Set architectural focus]
+        R5 --> R6[Update recent-work.md]
+        R6 --> R7[Display architect mode]
+    end
+    
+    subgraph "Session Documentation Flow (/document)"
+        D1[User: /document] --> D2[Read current_plan.md]
+        D2 --> D3[Analyze git commits]
+        D3 --> D4[Execute validation commands]
+        D4 --> D5[Compare planned vs actual]
+        D5 --> D6[Create session record]
+        D6 --> D7[Update progress in current_plan.md]
+        D7 --> D8[Save session-[date].md]
+        D8 --> D9[Display documentation summary]
+    end
+    
+    subgraph "Handoff Creation Flow (/handoff)"
+        H1[User: /handoff] --> H2[Read latest session documentation]
+        H2 --> H3[Read current_plan.md]
+        H3 --> H4[Analyze current state]
+        H4 --> H5[Determine next task]
+        H5 --> H6[Specify context requirements]
+        H6 --> H7[Create handoff document]
+        H7 --> H8[Generate next session prompt]
+        H8 --> H9[Save handoff-[date].md]
+        H9 --> H10[Display handoff summary]
+    end
+    
+    subgraph "Validation Flow (/validate)"
+        V1[User: /validate] --> V2[Read current_plan.md]
+        V2 --> V3[Extract validation commands]
+        V3 --> V4[Execute validation commands]
+        V4 --> V5[Capture command output]
+        V5 --> V6[Interpret results]
+        V6 --> V7[Update validation-results.md]
+        V7 --> V8[Display validation summary]
+    end
+    
+    subgraph "Next Task Flow (/next)"
+        N1[User: /next] --> N2[Read current_plan.md]
+        N2 --> N3[Read recent-work.md]
+        N3 --> N4[Execute validation commands]
+        N4 --> N5[Analyze completion status]
+        N5 --> N6[Determine next logical task]
+        N6 --> N7[Update current_plan.md]
+        N7 --> N8[Display next task recommendation]
+    end
+    
+    subgraph "File System State"
+        FS1[current_plan.md<br/>Central State]
+        FS2[session-memory/<br/>Session Tracking]
+        FS3[context-fragments/<br/>Reusable Context]
+        FS4[state/<br/>Validation Results]
+    end
+    
+    subgraph "External Systems"
+        EXT1[Git Repository]
+        EXT2[Validation Tools]
+        EXT3[Project Files]
+    end
+    
+    C2 --> FS1
+    C4 --> FS3
+    C7 --> FS2
+    
+    S2 --> FS1
+    S3 --> FS2
+    S4 --> EXT2
+    S7 --> FS4
+    
+    R2 --> FS1
+    R3 --> FS3
+    R6 --> FS2
+    
+    D2 --> FS1
+    D3 --> EXT1
+    D4 --> EXT2
+    D7 --> FS1
+    D8 --> FS2
+    
+    H2 --> FS2
+    H3 --> FS1
+    H9 --> FS2
+    
+    V2 --> FS1
+    V4 --> EXT2
+    V7 --> FS4
+    
+    N2 --> FS1
+    N3 --> FS2
+    N4 --> EXT2
+    N7 --> FS1
+    
+    classDef userAction fill:#e3f2fd
+    classDef fileOp fill:#f3e5f5
+    classDef processing fill:#e8f5e8
+    classDef output fill:#fff3e0
+    classDef stateFile fill:#ffebee
+    classDef external fill:#fafafa
+    
+    class C1,S1,R1,D1,H1,V1,N1 userAction
+    class C2,C3,S2,S3,R2,R3,D2,D3,H2,H3,V2,V3,N2,N3 fileOp
+    class C4,C5,C6,S4,S5,S6,R4,R5,D4,D5,D6,H4,H5,H6,V4,V5,V6,N4,N5,N6 processing
+    class C8,S8,R7,D9,H10,V8,N8 output
+    class FS1,FS2,FS3,FS4 stateFile
+    class EXT1,EXT2,EXT3 external

@@ -23,7 +23,12 @@ import sys
 project_root = Path(__file__).parent.parent.parent.parent
 sys.path.append(str(project_root))
 
-from src.core.interfaces import AnswerGenerator as AnswerGeneratorInterface, Document, Answer
+from src.core.interfaces import AnswerGenerator as AnswerGeneratorInterface, Document, Answer, HealthStatus
+
+# Forward declaration to avoid circular import
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from src.core.platform_orchestrator import PlatformOrchestrator
 from .base import ConfigurableComponent, GenerationParams, GenerationError, Citation
 
 # Import sub-component registries
@@ -138,11 +143,6 @@ class AnswerGenerator(AnswerGeneratorInterface, ConfigurableComponent):
         if model_name or temperature or max_tokens or use_ollama is not None:
             logger.info("Converting legacy parameters to new configuration format")
             
-            if use_ollama is False:
-                # If explicitly not using Ollama, we'd need other adapters
-                # For now, default to Ollama anyway
-                logger.warning("Non-Ollama providers not yet implemented, using Ollama")
-            
             # Override LLM config with legacy parameters
             if not config:
                 config = default_config.copy()
@@ -150,6 +150,16 @@ class AnswerGenerator(AnswerGeneratorInterface, ConfigurableComponent):
             # Ensure proper nested structure
             config.setdefault('llm_client', {})
             config['llm_client'].setdefault('config', {})
+            
+            # Handle different LLM providers
+            if use_ollama is False:
+                # Check if we have a configured LLM client type
+                if 'llm_client' in config and 'type' in config['llm_client']:
+                    # Use the configured LLM client type
+                    logger.info(f"Using configured LLM client: {config['llm_client']['type']}")
+                else:
+                    # Default to Ollama if no alternative is configured
+                    logger.warning("Non-Ollama providers not configured, using Ollama")
             
             if model_name:
                 config['llm_client']['config']['model_name'] = model_name
@@ -169,6 +179,9 @@ class AnswerGenerator(AnswerGeneratorInterface, ConfigurableComponent):
         # Track metrics
         self._generation_count = 0
         self._total_time = 0.0
+        
+        # Platform services (initialized via initialize_services)
+        self.platform: Optional['PlatformOrchestrator'] = None
         
         logger.info(f"Initialized AnswerGenerator with components: "
                    f"prompt_builder={self.config['prompt_builder']['type']}, "
@@ -235,6 +248,22 @@ class AnswerGenerator(AnswerGeneratorInterface, ConfigurableComponent):
             self._generation_count += 1
             self._total_time += elapsed_time
             
+            # Track performance using platform services
+            if self.platform:
+                self.platform.track_component_performance(
+                    self, 
+                    "answer_generation", 
+                    {
+                        "success": True,
+                        "generation_time": elapsed_time,
+                        "confidence": confidence,
+                        "query": query,
+                        "context_docs": len(context),
+                        "answer_length": len(answer_text),
+                        "citations_count": len(citations)
+                    }
+                )
+            
             logger.info(f"Generated answer in {elapsed_time:.2f}s with confidence {confidence:.3f}")
             
             return Answer(
@@ -245,6 +274,21 @@ class AnswerGenerator(AnswerGeneratorInterface, ConfigurableComponent):
             )
             
         except Exception as e:
+            # Track failure using platform services
+            if self.platform:
+                elapsed_time = time.time() - start_time
+                self.platform.track_component_performance(
+                    self, 
+                    "answer_generation", 
+                    {
+                        "success": False,
+                        "generation_time": elapsed_time,
+                        "query": query,
+                        "context_docs": len(context),
+                        "error": str(e)
+                    }
+                )
+            
             logger.error(f"Answer generation failed: {str(e)}")
             raise GenerationError(f"Failed to generate answer: {str(e)}") from e
     
@@ -333,6 +377,121 @@ class AnswerGenerator(AnswerGeneratorInterface, ConfigurableComponent):
         
         return True
     
+    # Standard ComponentBase interface implementation
+    def initialize_services(self, platform: 'PlatformOrchestrator') -> None:
+        """Initialize platform services for the component.
+        
+        Args:
+            platform: PlatformOrchestrator instance providing services
+        """
+        self.platform = platform
+        logger.info("AnswerGenerator initialized with platform services")
+
+    def get_health_status(self) -> HealthStatus:
+        """Get the current health status of the component.
+        
+        Returns:
+            HealthStatus object with component health information
+        """
+        if self.platform:
+            return self.platform.check_component_health(self)
+        
+        # Fallback if platform services not initialized
+        is_healthy = True
+        issues = []
+        
+        # Check sub-components
+        if not self.prompt_builder:
+            is_healthy = False
+            issues.append("Prompt builder not initialized")
+        
+        if not self.llm_client:
+            is_healthy = False
+            issues.append("LLM client not initialized")
+        
+        if not self.response_parser:
+            is_healthy = False
+            issues.append("Response parser not initialized")
+        
+        if not self.confidence_scorer:
+            is_healthy = False
+            issues.append("Confidence scorer not initialized")
+        
+        # Check LLM connection
+        try:
+            if self.llm_client and not self.llm_client.validate_connection():
+                is_healthy = False
+                issues.append("LLM connection validation failed")
+        except Exception as e:
+            is_healthy = False
+            issues.append(f"LLM validation error: {str(e)}")
+        
+        return HealthStatus(
+            is_healthy=is_healthy,
+            issues=issues,
+            metrics={
+                "sub_components": self.get_component_info(),
+                "generator_info": self.get_generator_info()
+            },
+            component_name=self.__class__.__name__
+        )
+
+    def get_metrics(self) -> Dict[str, Any]:
+        """Get component-specific metrics.
+        
+        Returns:
+            Dictionary containing component metrics
+        """
+        if self.platform:
+            return self.platform.collect_component_metrics(self)
+        
+        # Fallback if platform services not initialized
+        return {
+            "generation_count": self._generation_count,
+            "total_time": self._total_time,
+            "avg_time": self._total_time / max(1, self._generation_count),
+            "sub_components": self.get_component_info(),
+            "config": {
+                "prompt_builder": self.config['prompt_builder']['type'],
+                "llm_client": self.config['llm_client']['type'],
+                "response_parser": self.config['response_parser']['type'],
+                "confidence_scorer": self.config['confidence_scorer']['type']
+            }
+        }
+
+    def get_capabilities(self) -> List[str]:
+        """Get list of component capabilities.
+        
+        Returns:
+            List of capability strings
+        """
+        capabilities = [
+            "answer_generation",
+            "context_synthesis",
+            "modular_architecture",
+            "configurable_prompting",
+            "confidence_scoring",
+            "citation_generation"
+        ]
+        
+        # Add LLM-specific capabilities
+        if self.llm_client:
+            capabilities.append(f"llm_{self.config['llm_client']['type']}")
+        
+        # Add prompt builder capabilities
+        if self.prompt_builder:
+            capabilities.append(f"prompt_builder_{self.config['prompt_builder']['type']}")
+        
+        # Add parser capabilities
+        if self.response_parser:
+            capabilities.append(f"response_parser_{self.config['response_parser']['type']}")
+        
+        # Add scorer capabilities
+        if self.confidence_scorer:
+            capabilities.append(f"confidence_scorer_{self.config['confidence_scorer']['type']}")
+        
+        return capabilities
+    
     def _initialize_components(self) -> None:
         """Initialize all sub-components based on configuration."""
         # Initialize prompt builder
@@ -347,17 +506,22 @@ class AnswerGenerator(AnswerGeneratorInterface, ConfigurableComponent):
         adapter_class = get_adapter_class(llm_type)
         
         # Separate adapter constructor args from generation config
-        # OllamaAdapter expects: model_name, base_url, timeout, auto_pull, config
+        # Different adapters expect different parameters
         adapter_args = {}
         generation_config = {}
         
+        # Get adapter-specific parameter names from the adapter class
+        import inspect
+        adapter_signature = inspect.signature(adapter_class.__init__)
+        adapter_params = set(adapter_signature.parameters.keys()) - {'self'}
+        
         for key, value in llm_config.items():
-            if key in ['model_name', 'base_url', 'timeout', 'auto_pull']:
+            if key in adapter_params:
                 adapter_args[key] = value
             else:
                 generation_config[key] = value
         
-        # Pass generation config (temperature, max_tokens, etc.) as config parameter
+        # Pass generation config as config parameter if there are any
         if generation_config:
             adapter_args['config'] = generation_config
             
@@ -373,6 +537,9 @@ class AnswerGenerator(AnswerGeneratorInterface, ConfigurableComponent):
         scorer_type = self.config['confidence_scorer']['type']
         scorer_config = self.config['confidence_scorer'].get('config', {})
         scorer_class = get_scorer_class(scorer_type)
+        
+        # For semantic scorer, we'll pass embedder after platform initialization
+        # For now, initialize without embedder
         self.confidence_scorer = scorer_class(**scorer_config)
     
     def _get_generation_params(self) -> GenerationParams:
@@ -417,6 +584,12 @@ class AnswerGenerator(AnswerGeneratorInterface, ConfigurableComponent):
         metadata['provider'] = model_info.get('provider', 'unknown')
         
         return metadata
+    
+    def set_embedder(self, embedder):
+        """Set embedder for semantic confidence scoring."""
+        if hasattr(self.confidence_scorer, 'set_embedder'):
+            self.confidence_scorer.set_embedder(embedder)
+            logger.info("Embedder set for semantic confidence scoring")
     
     def _merge_configs(self, default: Dict[str, Any], override: Dict[str, Any]) -> Dict[str, Any]:
         """Deep merge configuration dictionaries."""
