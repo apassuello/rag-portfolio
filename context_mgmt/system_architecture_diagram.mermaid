@@ -1,0 +1,127 @@
+graph TB
+    subgraph "User Interface Layer"
+        UI[Claude Code Interface]
+        DEV[Developer]
+    end
+    
+    subgraph "Command Layer"
+        subgraph "Role Management"
+            ARCH[/architect]
+            IMPL[/implementer]
+            OPT[/optimizer]
+            VAL[/validator]
+        end
+        
+        subgraph "Context Management"
+            CTX[/context]
+            STAT[/status]
+        end
+        
+        subgraph "Workflow Management"
+            NEXT[/next]
+            VALIDATE[/validate]
+            PLAN[/plan]
+            BACKUP[/backup]
+        end
+        
+        subgraph "Session Management"
+            DOC[/document]
+            HANDOFF[/handoff]
+            SUMM[/summarize]
+            CHECKPOINT[/checkpoint]
+            TEMPLATE[/template]
+        end
+    end
+    
+    subgraph "State Management Layer"
+        CURRENT[current_plan.md<br/>Central State]
+        MEMORY[session-memory/<br/>Session Tracking]
+        STATE[state/<br/>Validation Results]
+    end
+    
+    subgraph "Context Fragment Layer"
+        FRAGMENTS[context-fragments/<br/>Reusable Context]
+        PROJECT[Project Files<br/>@filename references]
+        GIT[Git Repository<br/>History & Backups]
+    end
+    
+    subgraph "External Systems"
+        VALID[Validation Tools<br/>pytest, compliance]
+        FS[File System<br/>Read/Write Operations]
+    end
+    
+    DEV --> UI
+    UI --> ARCH
+    UI --> IMPL
+    UI --> OPT
+    UI --> VAL
+    UI --> CTX
+    UI --> STAT
+    UI --> NEXT
+    UI --> VALIDATE
+    UI --> PLAN
+    UI --> BACKUP
+    UI --> DOC
+    UI --> HANDOFF
+    UI --> SUMM
+    UI --> CHECKPOINT
+    UI --> TEMPLATE
+    
+    ARCH --> CURRENT
+    IMPL --> CURRENT
+    OPT --> CURRENT
+    VAL --> CURRENT
+    CTX --> CURRENT
+    STAT --> CURRENT
+    NEXT --> CURRENT
+    VALIDATE --> CURRENT
+    PLAN --> CURRENT
+    
+    CTX --> FRAGMENTS
+    ARCH --> FRAGMENTS
+    IMPL --> FRAGMENTS
+    OPT --> FRAGMENTS
+    VAL --> FRAGMENTS
+    
+    DOC --> MEMORY
+    HANDOFF --> MEMORY
+    SUMM --> MEMORY
+    STAT --> MEMORY
+    
+    VALIDATE --> STATE
+    STAT --> STATE
+    NEXT --> STATE
+    
+    STAT --> VALID
+    VALIDATE --> VALID
+    NEXT --> VALID
+    
+    BACKUP --> GIT
+    DOC --> GIT
+    HANDOFF --> GIT
+    
+    CTX --> PROJECT
+    ARCH --> PROJECT
+    IMPL --> PROJECT
+    
+    CURRENT --> FS
+    MEMORY --> FS
+    STATE --> FS
+    FRAGMENTS --> FS
+    PROJECT --> FS
+    
+    classDef roleCmd fill:#e1f5fe
+    classDef contextCmd fill:#f3e5f5
+    classDef workflowCmd fill:#e8f5e8
+    classDef sessionCmd fill:#fff3e0
+    classDef stateFile fill:#ffebee
+    classDef contextFile fill:#f1f8e9
+    classDef external fill:#fafafa
+    
+    class ARCH,IMPL,OPT,VAL roleCmd
+    class CTX,STAT contextCmd
+    class NEXT,VALIDATE,PLAN,BACKUP workflowCmd
+    class DOC,HANDOFF,SUMM,CHECKPOINT,TEMPLATE sessionCmd
+    class CURRENT,MEMORY,STATE stateFile
+    class FRAGMENTS,PROJECT,GIT contextFile
+    class VALID,FS external
