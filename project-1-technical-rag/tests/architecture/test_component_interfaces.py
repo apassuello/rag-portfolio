@@ -21,7 +21,7 @@ from typing import Dict, Any, List, Type
 from unittest.mock import patch
 
 # Add project root to Python path
-project_root = Path(__file__).parent.parent.parent.parent
+project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root / "src"))
 
 from src.core.component_factory import ComponentFactory
