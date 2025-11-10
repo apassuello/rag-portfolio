@@ -32,29 +32,24 @@ class TestBM25ScoringQuality:
         # Create test documents with known content
         self.test_documents = [
             Document(
-                id="doc1",
                 content="RISC-V is an open instruction set architecture",
-                metadata={"source": "test"}
+                metadata={"id": "doc1", "source": "test"}
             ),
             Document(
-                id="doc2", 
                 content="RISC-V RISC-V processor implements the RISC-V instruction set",
-                metadata={"source": "test"}
+                metadata={"id": "doc2", "source": "test"}
             ),
             Document(
-                id="doc3",
                 content="The weather in Paris is beautiful today",
-                metadata={"source": "test"}
+                metadata={"id": "doc3", "source": "test"}
             ),
             Document(
-                id="doc4",
                 content="Computer architecture includes instruction set design",
-                metadata={"source": "test"}
+                metadata={"id": "doc4", "source": "test"}
             ),
             Document(
-                id="doc5",
                 content="RISC-V provides a modular instruction set architecture with optional extensions for vector processing",
-                metadata={"source": "test"}
+                metadata={"id": "doc5", "source": "test"}
             )
         ]
         
@@ -152,15 +147,13 @@ class TestBM25ScoringQuality:
         """Verify document length normalization works correctly."""
         # Create two docs with same term frequency ratio but different lengths
         short_doc = Document(
-            id="short",
             content="RISC-V architecture",
-            metadata={"source": "test"}
+            metadata={"id": "short", "source": "test"}
         )
-        
+
         long_doc = Document(
-            id="long",
             content="RISC-V architecture is an open instruction set architecture " * 3,
-            metadata={"source": "test"}
+            metadata={"id": "long", "source": "test"}
         )
         
         # Create new BM25 instance with these docs
@@ -297,9 +290,8 @@ class TestBM25EdgeCases:
     def test_single_document_corpus(self):
         """Test BM25 with only one document."""
         single_doc = Document(
-            id="single",
             content="RISC-V processor architecture",
-            metadata={}
+            metadata={"id": "single"}
         )
         
         bm25 = BM25Retriever({"k1": 1.2, "b": 0.75})
