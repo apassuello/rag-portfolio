@@ -29,3 +29,4 @@ wandb/
 # Stale documentation and temporary files
 project-1-technical-rag/temp/
 **/temp/
+.env.epic8
