@@ -147,8 +147,8 @@ class TestEntityExtractor(unittest.TestCase):
         
         # Create test documents
         documents = [
-            Document(id="doc1", content="RISC-V is an instruction set architecture"),
-            Document(id="doc2", content="The vector extension implements SIMD operations")
+            Document(content="RISC-V is an instruction set architecture", metadata={"id": "doc1"}),
+            Document(content="The vector extension implements SIMD operations", metadata={"id": "doc2"})
         ]
         
         result = extractor.extract_entities(documents)
@@ -226,7 +226,7 @@ class TestDocumentGraphBuilder(unittest.TestCase):
         
         # Create test documents
         documents = [
-            Document(id="doc1", content="RISC-V instruction set architecture")
+            Document(content="RISC-V instruction set architecture", metadata={"id": "doc1"})
         ]
         
         result = builder.build_graph(documents)
