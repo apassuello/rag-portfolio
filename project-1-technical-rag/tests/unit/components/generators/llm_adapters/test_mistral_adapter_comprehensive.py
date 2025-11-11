@@ -35,7 +35,6 @@ from src.components.generators.llm_adapters.base_adapter import RateLimitError, 
 from src.components.generators.base import GenerationParams, LLMError
 
 
-@pytest.mark.skip(reason="Tests call non-existent private methods (_calculate_cost, _format_request, _map_error, _process_response). Implementation uses different method names and signatures.")
 class TestMistralAdapterComprehensive:
     """Comprehensive test suite for MistralAdapter covering untested functionality."""
     
