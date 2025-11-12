@@ -4,9 +4,17 @@ Unit tests for graph components (Epic 2 Week 2).
 This module provides comprehensive tests for the graph-based retrieval
 components including entity extraction, graph construction, relationship
 mapping, and graph retrieval functionality.
+
+Note: Despite the docstring saying "Unit tests", this file contains "Integration tests"
+for graph components (see class docstrings). Should be in tests/integration/graph/
+but kept here with proper markers.
 """
 
 import unittest
+import pytest
+
+# Mark entire module as integration test
+pytestmark = [pytest.mark.integration]
 import tempfile
 import os
 from unittest.mock import Mock, patch, MagicMock
