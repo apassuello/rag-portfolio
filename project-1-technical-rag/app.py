@@ -290,21 +290,37 @@ def main():
                     retrieved_docs = retrieve_documents(system, query, top_k=top_k)
                     retrieval_time = (time.time() - retrieval_start) * 1000
 
-                    # Answer generation
-                    generation_start = time.time()
-                    if system['llm_type'] == 'ollama':
-                        answer = generate_answer_ollama(system, query, retrieved_docs)
+                    # Query filtering - check relevance threshold
+                    relevance_threshold = 0.5
+                    if retrieved_docs and retrieved_docs[0][1] < relevance_threshold:
+                        # Query filtered - out of domain
+                        answer = f"""⚠️ **Query Filtered**
+
+I don't have information about this topic in my knowledge base. This system specializes in RISC-V technical documentation.
+
+**Top relevance score:** {retrieved_docs[0][1]:.3f} (threshold: {relevance_threshold})
+
+The query appears to be outside the knowledge base domain."""
+                        generation_time = 0
+                        filtered = True
                     else:
-                        answer = generate_answer_mock(query, retrieved_docs)
-                    generation_time = (time.time() - generation_start) * 1000
+                        # Answer generation
+                        filtered = False
+                        generation_start = time.time()
+                        if system['llm_type'] == 'ollama':
+                            answer = generate_answer_ollama(system, query, retrieved_docs)
+                        else:
+                            answer = generate_answer_mock(query, retrieved_docs)
+                        generation_time = (time.time() - generation_start) * 1000
 
                     # Store in session
                     st.session_state.messages.append({
                         'query': query,
                         'answer': answer,
-                        'sources': retrieved_docs,
+                        'sources': retrieved_docs if not filtered else [],
                         'retrieval_time': retrieval_time,
-                        'generation_time': generation_time
+                        'generation_time': generation_time,
+                        'filtered': filtered
                     })
 
         # Display conversation history
