@@ -329,13 +329,14 @@ To get real AI-generated answers:
 
 Or use OpenAI: python scripts/demo_rag.py --query "..." --use-openai"""
 
-    def query(self, query_text: str, show_sources: bool = False) -> Dict[str, Any]:
+    def query(self, query_text: str, show_sources: bool = False, relevance_threshold: float = 0.5) -> Dict[str, Any]:
         """
         Execute full RAG pipeline.
 
         Args:
             query_text: User query
             show_sources: Whether to display retrieved sources
+            relevance_threshold: Minimum relevance score (default: 0.5)
 
         Returns:
             Complete RAG response with timing
@@ -351,6 +352,34 @@ Or use OpenAI: python scripts/demo_rag.py --query "..." --use-openai"""
         retrieval_time = (time.time() - retrieval_start) * 1000
 
         print(f"   ✓ Retrieved {len(retrieved_docs)} documents ({retrieval_time:.1f}ms)")
+
+        # Query filtering - check if top result meets relevance threshold
+        if retrieved_docs and retrieved_docs[0][1] < relevance_threshold:
+            print(f"\n⚠️  Query filtered: Top relevance score ({retrieved_docs[0][1]:.3f}) below threshold ({relevance_threshold})")
+            print("   This query appears to be outside the knowledge base domain.")
+
+            filtered_response = {
+                'answer': "I don't have information about this topic in my knowledge base. This system specializes in RISC-V technical documentation.",
+                'sources': [],
+                'num_sources': 0,
+                'llm_type': 'filtered',
+                'filtered': True,
+                'top_score': retrieved_docs[0][1],
+                'query': query_text,
+                'retrieval_time_ms': retrieval_time,
+                'generation_time_ms': 0,
+                'total_time_ms': retrieval_time
+            }
+
+            print("\n" + "─" * 80)
+            print("📝 ANSWER:")
+            print("─" * 80)
+            print(filtered_response['answer'])
+            print("─" * 80)
+            print(f"\n⏱️  Timing: Retrieval={retrieval_time:.1f}ms (query filtered, no LLM call)")
+            print("=" * 80 + "\n")
+
+            return filtered_response
 
         if show_sources:
             print("\n   Top sources:")
@@ -394,7 +423,7 @@ Or use OpenAI: python scripts/demo_rag.py --query "..." --use-openai"""
             'total_time_ms': total_time
         }
 
-    def interactive_mode(self, show_sources: bool = False):
+    def interactive_mode(self, show_sources: bool = False, relevance_threshold: float = 0.5):
         """Run interactive RAG demo."""
         print("\n" + "=" * 80)
         print("🚀 INTERACTIVE RAG DEMO")
@@ -403,6 +432,7 @@ Or use OpenAI: python scripts/demo_rag.py --query "..." --use-openai"""
         print("  - Enter a question to get an AI answer")
         print("  - 'sources' to toggle source display")
         print("  - 'quit' or 'exit' to stop")
+        print(f"\nRelevance threshold: {relevance_threshold:.2f}")
         print("=" * 80)
 
         while True:
@@ -422,7 +452,7 @@ Or use OpenAI: python scripts/demo_rag.py --query "..." --use-openai"""
                     continue
 
                 # Execute query
-                self.query(query, show_sources=show_sources)
+                self.query(query, show_sources=show_sources, relevance_threshold=relevance_threshold)
 
             except KeyboardInterrupt:
                 print("\n\nExiting RAG demo...")
@@ -485,6 +515,13 @@ Examples:
     )
 
     parser.add_argument(
+        '--relevance-threshold',
+        type=float,
+        default=0.5,
+        help='Minimum relevance score for query filtering (default: 0.5)'
+    )
+
+    parser.add_argument(
         '--indices-dir',
         type=Path,
         help='Directory containing indices (default: data/indices)'
@@ -502,9 +539,16 @@ Examples:
 
         # Run appropriate mode
         if args.interactive:
-            rag.interactive_mode(show_sources=args.show_sources)
+            rag.interactive_mode(
+                show_sources=args.show_sources,
+                relevance_threshold=args.relevance_threshold
+            )
         elif args.query:
-            rag.query(args.query, show_sources=args.show_sources)
+            rag.query(
+                args.query,
+                show_sources=args.show_sources,
+                relevance_threshold=args.relevance_threshold
+            )
         else:
             parser.print_help()
             print("\n💡 Tip: Try --interactive mode for a conversation-style demo")
