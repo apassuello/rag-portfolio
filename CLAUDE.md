@@ -415,12 +415,24 @@ Currently working on **Project 1: Technical Documentation RAG System**.
 
 **System Status**: 🎉 **PRODUCTION READY** (85/100)
 
-### Optional Enhancements (Non-Critical)
+### Deployment Preparation (In Progress)
 
-**Phase 1: LLM Integration** (Optional, 1-2 hours)
-1. Configure Ollama for local LLM inference
-2. Test end-to-end RAG query pipeline
-3. Benchmark answer generation quality
+**Phase 1: RAG Demo Enhancement** (Partially Complete)
+- ✅ **Query Filtering Implemented** (Nov 17): Relevance threshold (0.5) to reject irrelevant queries
+  - Added to `demo_rag.py` with configurable threshold
+  - Added to `app.py` (Streamlit) with filtered status display
+  - Prevents LLM calls for out-of-domain queries
+  - Validates system correctly discriminates relevant vs irrelevant content
+- ⏳ **LLM Integration Pending**: Configure Ollama for local inference
+  - Scripts ready: `demo_rag.py`, `app.py`, `OLLAMA_SETUP.md`
+  - Fallback: Mock LLM or OpenAI API
+- ⏳ **End-to-End Testing Pending**: Full RAG pipeline validation
+
+**Next Steps**:
+1. Install Ollama and download model (llama3.2:3b recommended)
+2. Test demo_rag.py with domain and out-of-domain queries
+3. Test Streamlit app locally
+4. Prepare for cloud deployment
 
 **Phase 2: Deployment Preparation** (1-2 hours)
 1. Update README with production-ready status
