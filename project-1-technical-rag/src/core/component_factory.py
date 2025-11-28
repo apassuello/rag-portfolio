@@ -93,16 +93,34 @@ class ComponentFactory:
         "modular_query_processor": "src.components.query_processors.modular_query_processor.ModularQueryProcessor",  # Alias for compatibility
         "domain_aware": "src.components.query_processors.domain_aware_query_processor.DomainAwareQueryProcessor",  # Epic 1 Phase 1 Domain-Aware Processor
         "epic1_domain_aware": "src.components.query_processors.domain_aware_query_processor.DomainAwareQueryProcessor",  # Alias for Epic 1
+        "intelligent": "src.components.query_processors.intelligent_query_processor.IntelligentQueryProcessor",  # Epic 5 Phase 2 Block 3 Intelligent Processor
+        "epic5_intelligent": "src.components.query_processors.intelligent_query_processor.IntelligentQueryProcessor",  # Alias for Epic 5
     }
     
     # Query analyzer implementations (used by ModularQueryProcessor)
     _QUERY_ANALYZERS: Dict[str, str] = {
         "nlp": "src.components.query_processors.analyzers.nlp_analyzer.NLPAnalyzer",
-        "rule_based": "src.components.query_processors.analyzers.rule_based_analyzer.RuleBasedAnalyzer", 
+        "rule_based": "src.components.query_processors.analyzers.rule_based_analyzer.RuleBasedAnalyzer",
         "epic1": "src.components.query_processors.analyzers.epic1_query_analyzer.Epic1QueryAnalyzer",
         "epic1_ml": "src.components.query_processors.analyzers.epic1_ml_analyzer.Epic1MLAnalyzer",  # Epic 1 ML-powered analyzer
         "epic1_ml_adapter": "src.components.query_processors.analyzers.epic_ml_adapter.EpicMLAdapter",  # Epic 1 with trained models
     }
+
+    # Epic 5: Tool implementations (Phase 1)
+    _TOOLS: Dict[str, str] = {
+        "calculator": "src.components.query_processors.tools.implementations.calculator_tool.CalculatorTool",
+        "code_analyzer": "src.components.query_processors.tools.implementations.code_analyzer_tool.CodeAnalyzerTool",
+        "document_search": "src.components.query_processors.tools.implementations.document_search_tool.DocumentSearchTool",
+    }
+
+    # Epic 5: Memory implementations (Phase 2 Block 1)
+    _MEMORY: Dict[str, str] = {
+        "conversation": "src.components.query_processors.agents.memory.conversation_memory.ConversationMemory",
+        "working": "src.components.query_processors.agents.memory.working_memory.WorkingMemory",
+    }
+
+    # Epic 5: Tool registry (Phase 1)
+    _TOOL_REGISTRY: str = "src.components.query_processors.tools.tool_registry.ToolRegistry"
     
     # Phase 4: Performance monitoring and caching
     _performance_metrics: Dict[str, Dict[str, Any]] = defaultdict(lambda: {
@@ -923,21 +941,21 @@ class ComponentFactory:
             if processor_type == 'modular' or processor_type == 'modular_query_processor':
                 # ModularQueryProcessor needs retriever and generator instances
                 from src.components.query_processors.base import QueryProcessorConfig
-                
+
                 # Get or create required dependencies
                 retriever = kwargs.pop('retriever', None)
                 generator = kwargs.pop('generator', None)
-                
+
                 if retriever is None:
                     # Create a default retriever if not provided
                     # ModularUnifiedRetriever needs an embedder
                     embedder = cls.create_embedder('sentence_transformer')
                     retriever = cls.create_retriever('modular_unified', embedder=embedder)
-                    
+
                 if generator is None:
                     # Create a default generator if not provided
                     generator = cls.create_generator('adaptive_modular')
-                
+
                 # Build config from remaining kwargs
                 config = QueryProcessorConfig(
                     analyzer_type=kwargs.pop('analyzer_type', 'rule_based'),
@@ -947,12 +965,12 @@ class ComponentFactory:
                     assembler_type=kwargs.pop('assembler_type', 'standard'),
                     assembler_config=kwargs.pop('assembler_config', {})
                 )
-                
+
                 # Remove legacy parameters that don't belong to ModularQueryProcessor
                 legacy_params = ['default_k', 'min_confidence', 'enable_performance_monitoring']
                 for param in legacy_params:
                     kwargs.pop(param, None)
-                
+
                 # Create processor with correct arguments
                 return cls._create_with_tracking(
                     processor_class,
@@ -962,11 +980,52 @@ class ComponentFactory:
                     config=config,
                     **kwargs  # Any remaining kwargs
                 )
+            # Special handling for IntelligentQueryProcessor (Epic 5 Phase 2 Block 3)
+            elif processor_type == 'intelligent' or processor_type == 'epic5_intelligent':
+                # IntelligentQueryProcessor needs retriever, generator, agent, and query_analyzer
+                from src.components.query_processors.agents.models import ProcessorConfig
+
+                # Get required dependencies (must be provided)
+                retriever = kwargs.pop('retriever', None)
+                generator = kwargs.pop('generator', None)
+                agent = kwargs.pop('agent', None)
+                query_analyzer = kwargs.pop('query_analyzer', None)
+
+                if retriever is None:
+                    raise ValueError("IntelligentQueryProcessor requires 'retriever' parameter")
+                if generator is None:
+                    raise ValueError("IntelligentQueryProcessor requires 'generator' parameter")
+                if agent is None:
+                    raise ValueError("IntelligentQueryProcessor requires 'agent' parameter (ReActAgent)")
+                if query_analyzer is None:
+                    raise ValueError("IntelligentQueryProcessor requires 'query_analyzer' parameter (QueryAnalyzer)")
+
+                # Build config from remaining kwargs or use provided config
+                config = kwargs.pop('config', None)
+                if config is None:
+                    config = ProcessorConfig(
+                        use_agent_by_default=kwargs.pop('use_agent_by_default', False),
+                        complexity_threshold=kwargs.pop('complexity_threshold', 0.7),
+                        max_agent_cost=kwargs.pop('max_agent_cost', 0.10),
+                        enable_planning=kwargs.pop('enable_planning', False),
+                        enable_parallel_execution=kwargs.pop('enable_parallel_execution', False)
+                    )
+
+                # Create processor with correct arguments
+                return cls._create_with_tracking(
+                    processor_class,
+                    f"query_processor_{processor_type}",
+                    retriever=retriever,
+                    generator=generator,
+                    agent=agent,
+                    query_analyzer=query_analyzer,
+                    config=config
+                )
             else:
                 # Default handling for other processor types
                 return cls._create_with_tracking(
-                    processor_class, 
-                    f"query_processor_{processor_type}", 
+                    processor_class,
+                    f"query_processor_{processor_type}",
                     **kwargs
                 )
         except Exception as e:
@@ -976,15 +1035,119 @@ class ComponentFactory:
             ) from e
     
     @classmethod
+    def create_tool(cls, tool_type: str, **kwargs) -> Any:
+        """
+        Create a tool instance (Epic 5).
+
+        Args:
+            tool_type: Type of tool ("calculator", "code_analyzer", "document_search")
+            **kwargs: Arguments to pass to the tool constructor
+
+        Returns:
+            Instantiated Tool
+
+        Raises:
+            ValueError: If tool type is not supported
+            TypeError: If constructor arguments are invalid
+        """
+        if tool_type not in cls._TOOLS:
+            available = list(cls._TOOLS.keys())
+            raise ValueError(
+                f"Unknown tool type '{tool_type}'. "
+                f"Available tools: {available}"
+            )
+
+        tool_module_path = cls._TOOLS[tool_type]
+        tool_class = cls._get_component_class(tool_module_path)
+
+        try:
+            return cls._create_with_tracking(
+                tool_class,
+                f"tool_{tool_type}",
+                **kwargs
+            )
+        except Exception as e:
+            raise TypeError(
+                f"Failed to create tool '{tool_type}': {e}. "
+                f"Check constructor arguments: {kwargs}"
+            ) from e
+
+    @classmethod
+    def create_memory(cls, memory_type: str, **kwargs) -> Any:
+        """
+        Create a memory instance (Epic 5).
+
+        Args:
+            memory_type: Type of memory ("conversation", "working")
+            **kwargs: Arguments to pass to the memory constructor
+
+        Returns:
+            Instantiated Memory
+
+        Raises:
+            ValueError: If memory type is not supported
+            TypeError: If constructor arguments are invalid
+        """
+        if memory_type not in cls._MEMORY:
+            available = list(cls._MEMORY.keys())
+            raise ValueError(
+                f"Unknown memory type '{memory_type}'. "
+                f"Available memory types: {available}"
+            )
+
+        memory_module_path = cls._MEMORY[memory_type]
+        memory_class = cls._get_component_class(memory_module_path)
+
+        try:
+            return cls._create_with_tracking(
+                memory_class,
+                f"memory_{memory_type}",
+                **kwargs
+            )
+        except Exception as e:
+            raise TypeError(
+                f"Failed to create memory '{memory_type}': {e}. "
+                f"Check constructor arguments: {kwargs}"
+            ) from e
+
+    @classmethod
+    def create_tool_registry(cls, **kwargs) -> Any:
+        """
+        Create a ToolRegistry instance (Epic 5).
+
+        Args:
+            **kwargs: Arguments to pass to the ToolRegistry constructor
+
+        Returns:
+            Instantiated ToolRegistry
+
+        Raises:
+            TypeError: If constructor arguments are invalid
+        """
+        registry_class = cls._get_component_class(cls._TOOL_REGISTRY)
+
+        try:
+            return cls._create_with_tracking(
+                registry_class,
+                "tool_registry",
+                **kwargs
+            )
+        except Exception as e:
+            raise TypeError(
+                f"Failed to create ToolRegistry: {e}. "
+                f"Check constructor arguments: {kwargs}"
+            ) from e
+
+    @classmethod
     def is_supported(cls, component_type: str, name: str) -> bool:
         """
         Check if a component type and name are supported.
-        
+
         Args:
-            component_type: Type of component ('processor', 'embedder', 'vector_store', 
-                           'retriever', 'generator')
+            component_type: Type of component ('processor', 'embedder', 'vector_store',
+                           'retriever', 'generator', 'tool', 'memory')
             name: Component name to check
-            
+
         Returns:
             True if component is supported, False otherwise
         """
@@ -995,13 +1158,15 @@ class ComponentFactory:
             'retriever': cls._RETRIEVERS,
             'generator': cls._GENERATORS,
             'query_processor': cls._QUERY_PROCESSORS,
-            'query_analyzer': cls._QUERY_ANALYZERS
+            'query_analyzer': cls._QUERY_ANALYZERS,
+            'tool': cls._TOOLS,
+            'memory': cls._MEMORY
         }
-        
+
         mapping = type_mappings.get(component_type)
         if mapping is None:
             return False
-        
+
         return name in mapping
     
     @classmethod
@@ -1013,7 +1178,7 @@ class ComponentFactory:
     def get_available_components(cls) -> Dict[str, list[str]]:
         """
         Get all available components organized by type.
-        
+
         Returns:
             Dictionary mapping component types to lists of available component names
         """
@@ -1025,6 +1190,8 @@ class ComponentFactory:
             "generators": list(cls._GENERATORS.keys()),
             "query_processors": list(cls._QUERY_PROCESSORS.keys()),
             "query_analyzers": list(cls._QUERY_ANALYZERS.keys()),
+            "tools": list(cls._TOOLS.keys()),
+            "memory": list(cls._MEMORY.keys()),
         }
     
     @classmethod
