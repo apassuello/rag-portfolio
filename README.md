@@ -5,6 +5,7 @@
 ![Code Quality](https://img.shields.io/badge/type%20hints-93.9%25-brightgreen.svg)
 ![Tests](https://img.shields.io/badge/tests-2555%20functions-brightgreen.svg)
 [![K8s Tests](https://github.com/apassuello/rag-portfolio/actions/workflows/k8s-testing.yml/badge.svg)](https://github.com/apassuello/rag-portfolio/actions/workflows/k8s-testing.yml)
+[![Helm Tests](https://github.com/apassuello/rag-portfolio/actions/workflows/helm-testing.yml/badge.svg)](https://github.com/apassuello/rag-portfolio/actions/workflows/helm-testing.yml)
 
 **A comprehensive portfolio demonstrating the transition from embedded systems engineering to AI/ML through RAG system development.**
 
