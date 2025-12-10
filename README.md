@@ -8,6 +8,10 @@
 
 **A comprehensive portfolio demonstrating the transition from embedded systems engineering to AI/ML through RAG system development.**
 
+## 🚀 [Live Demo on HuggingFace Spaces](https://huggingface.co/spaces/ArthyP/enhanced-rag-demo)
+
+Try the RAG system with technical documentation queries. *Note: Demo shows earlier system version; current codebase includes additional Epic 1 (multi-model routing) and Epic 2 (hybrid retrieval) enhancements.*
+
 ## 🎯 Portfolio Overview
 
 ### Current Status: Development Complete
