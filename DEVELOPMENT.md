@@ -185,15 +185,12 @@ I regularly code in Python without AI assistance and can:
 - Efficient use of modern tooling while maintaining engineering oversight
 - Every design decision is mine; implementation is accelerated by AI
 
-## Transparency for Employers
-
-If you're reviewing this portfolio for a role, I want to be transparent:
+## Disclaimer 
 
 1. **I used AI assistance extensively** for implementation
 2. **All architectural decisions are mine** and I can defend them
 3. **I reviewed every line** and understand the codebase deeply
-4. **I can code without AI** and frequently do for debugging and optimization
-5. **This approach reflects modern software engineering** in 2024-2025
+4. **This approach reflects modern software engineering** in 2024-2025
 
 ## Questions Welcome
 
