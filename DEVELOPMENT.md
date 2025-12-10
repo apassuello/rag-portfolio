@@ -25,15 +25,42 @@ This portfolio was developed using **AI-assisted development** with Claude AI an
 - Comprehensive test infrastructure (2,555 test functions, 241K lines)
 - Security-first design from medical device firmware background
 
+### Custom AI-Development Infrastructure (100% Human - Arthur Passuello)
+
+**I engineered a sophisticated AI-assisted development workflow** using custom Claude Code agents, commands, and skills:
+
+**`.claude/` Development System** (5 specialized components):
+- **Custom Agents**: Domain-specific AI agents for architecture, implementation, optimization, validation, and portfolio curation
+- **Context Templates**: 5 specialized development modes (ARCHITECT, IMPLEMENTER, OPTIMIZER, VALIDATOR, PORTFOLIO_CURATOR)
+- **Memory Bank**: Persistent knowledge base for architectural patterns, performance optimizations, Swiss engineering standards
+- **Session Templates**: Structured progress tracking and handoff between development sessions
+- **Validation Scripts**: Automated system readiness verification
+
+**Why This Matters**:
+Building custom AI-development tooling demonstrates:
+- **Workflow Engineering**: Designed process, gateways, and validation steps for reliable AI collaboration
+- **Systems Thinking**: Created reusable infrastructure for consistent AI-assisted development
+- **Quality Control**: Implemented validation gates preventing AI errors from reaching production
+- **Documentation Discipline**: Structured knowledge preservation across development sessions
+
+**Technical Implementation**:
+- Custom prompt templates for domain-specific guidance (RAG systems, K8s deployment)
+- Session bootstrapping for consistent AI context across development phases
+- Automated validation preventing architectural drift
+- Knowledge bank preventing repeated context loading
+
+**This infrastructure is itself a portfolio piece** - it shows engineering discipline applied to AI-assisted development workflows, not just using AI tools as-is.
+
 ### Implementation (AI-Assisted with Human Review)
 
-**Code Generation**: Claude AI via Cursor IDE
+**Code Generation**: Claude AI via Cursor IDE + Custom Agents
 **Human Oversight**: Arthur Passuello reviewed every line of code
 **Process**:
 1. I define architectural requirements and component interfaces
-2. Claude generates implementation following specifications
-3. I review, test, and refine the generated code
+2. Claude (guided by custom agents) generates implementation following specifications
+3. I review, test, and refine the generated code using validation scripts
 4. I make architectural adjustments based on implementation learnings
+5. I update memory bank and context templates with lessons learned
 
 ### Technical Decisions I Made
 
