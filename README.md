@@ -1,31 +1,42 @@
 # RAG Portfolio: Swiss Engineering Excellence in AI/ML
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
+![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)
+![Code Quality](https://img.shields.io/badge/type%20hints-93.9%25-brightgreen.svg)
+![Tests](https://img.shields.io/badge/tests-2555%20functions-brightgreen.svg)
+[![K8s Tests](https://github.com/apassuello/rag-portfolio/actions/workflows/k8s-testing.yml/badge.svg)](https://github.com/apassuello/rag-portfolio/actions/workflows/k8s-testing.yml)
+[![Helm Tests](https://github.com/apassuello/rag-portfolio/actions/workflows/helm-testing.yml/badge.svg)](https://github.com/apassuello/rag-portfolio/actions/workflows/helm-testing.yml)
+
 **A comprehensive portfolio demonstrating the transition from embedded systems engineering to AI/ML through RAG system development.**
+
+## 🚀 [Live Demo on HuggingFace Spaces](https://huggingface.co/spaces/ArthyP/enhanced-rag-demo)
+
+Try the RAG system with technical documentation queries. *Note: Demo shows earlier system version; current codebase includes additional Epic 1 (multi-model routing) and Epic 2 (hybrid retrieval) enhancements.*
 
 ## 🎯 Portfolio Overview
 
 ### Current Status: Development Complete
-- **Portfolio Score**: 90.2% (based on internal validation metrics)
-- **System Completeness**: All 6 components implemented and tested
-- **Testing Framework**: 122 test cases with defined acceptance criteria
-- **Architecture**: Modular design with sub-component implementation
+- **System Completeness**: All 6 components implemented with modular architecture
+- **Code Quality**: 93.9% type hints, zero bare exceptions, comprehensive error handling
+- **Test Infrastructure**: 2,555 test functions across 241K lines of test code
+- **Deployment Ready**: K8s/Helm infrastructure with multi-environment support
 
 ### Developer Profile
 **Arthur Passuello** - Embedded Systems Engineer → AI/ML Engineer
 - **Background**: 2.5 years medical device firmware development
-- **Optimization Expertise**: Applied embedded efficiency principles to ML systems
-- **Performance Achievements**: 48.7x speedup, 565K chars/sec processing
-- **Swiss Market Focus**: Quality-first approach with comprehensive validation
+- **Engineering Approach**: Applied embedded systems discipline to ML infrastructure
+- **Focus**: Production-grade code quality, comprehensive testing, security-first design
+- **Swiss Market Alignment**: Quality over speed, evidence-based development, thorough documentation
 
 ## 📁 Project Structure
 
 ### Project 1: Technical Documentation RAG System
 📂 **`project-1-technical-rag/`** - RAG system for technical documentation
-- **Status**: Development complete with functional validation
-- **Architecture**: 6-component modular system with sub-components
-- **Performance**: 565K chars/sec processing, 1.12s answer generation (measured in development)
-- **Testing**: 122 test cases with defined acceptance criteria
-- **Deployment**: Configured for local development and testing
+- **Status**: Production-grade architecture ready for deployment
+- **Architecture**: 6-component modular system with 97 sub-components
+- **Features**: Multi-model routing, hybrid retrieval (FAISS + BM25), neural reranking
+- **Testing**: 2,555 test functions with comprehensive coverage
+- **Deployment**: K8s/Helm infrastructure with multi-cloud support (AWS EKS/ECS, GCP, Azure)
 
 ### Enhanced Multi-Layer Context System
 📂 **`.claude/`** - Advanced development context management system
